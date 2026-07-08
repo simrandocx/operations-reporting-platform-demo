@@ -25,20 +25,25 @@ def _get_weeks(year, month):
     first = date(year, month, 1)
     last = date(year, month, calendar.monthrange(year, month)[1])
     weeks, current = [], first
+
     while current <= last:
         days_until_sunday = 6 - current.weekday()
         week_end = min(current + timedelta(days=days_until_sunday), last)
+
         if current.month == week_end.month:
             label = f"{current.day}\u2013{week_end.day} {current.strftime('%b')}"
         else:
             label = f"{current.day} {current.strftime('%b')}\u2013{week_end.day} {week_end.strftime('%b')}"
+
         weeks.append((current.strftime("%Y-%m-%d"), week_end.strftime("%Y-%m-%d"), label))
         current = week_end + timedelta(days=1)
+
     return weeks
 
 
 def seed_demo_data(verbose=True):
     """(Re)creates all tables and fills them with synthetic sample data.
+
     Safe to call repeatedly -- it wipes existing rows first, so this also
     works as a "reset demo data" action for a public deployment.
     """
@@ -63,20 +68,27 @@ def seed_demo_data(verbose=True):
         ("Outside Contract A", "outside_contract"),
         ("Outside Contract B", "outside_contract"),
     ]
-    conn.executemany("INSERT INTO hotels (name, customer_type) VALUES (?,?)", hotels_data)
+
+    conn.executemany(
+        "INSERT INTO hotels (name, customer_type) VALUES (?,?)",
+        hotels_data
+    )
     conn.commit()
 
     hotels = conn.execute("SELECT * FROM hotels").fetchall()
+
     if verbose:
         print(f"Created {len(hotels)} sample customers.")
 
     random.seed(42)
+
     months = [(2025, 1), (2025, 2), (2025, 3)]
     result_count = 0
     pool_count = 0
 
     for year, month in months:
         weeks = _get_weeks(year, month)
+
         for h in hotels:
             base = random.uniform(200, 1200)
 
@@ -87,7 +99,10 @@ def seed_demo_data(verbose=True):
                        guest_laundry_income, staff_laundry_income, flat_laundry_income, notes)
                     VALUES (?,?,?,?,?,?,?,?)
                 """, (
-                    h["id"], week_start, week_end, label,
+                    h["id"],
+                    week_start,
+                    week_end,
+                    label,
                     round(random.uniform(50, base), 2),
                     round(random.uniform(20, base * 0.4), 2),
                     round(random.uniform(0, base * 0.3), 2),
@@ -95,16 +110,22 @@ def seed_demo_data(verbose=True):
                 ))
                 result_count += 1
 
-                # A few sample pool stock (linen movement) rows per week
-                for item in random.sample(LINEN_ITEMS, k=3):
+                # A few sample pool stock rows per week.
+                # Each packing list reference is unique per hotel, week and item,
+                # so the demo does not show ugly duplicate-reference warnings.
+                sampled_items = random.sample(LINEN_ITEMS, k=3)
+
+                for item_index, item in enumerate(sampled_items, start=1):
                     conn.execute("""
                         INSERT INTO pool_stock
                           (hotel_id, entry_date, linen_item, quantity, packing_list_ref, notes)
                         VALUES (?,?,?,?,?,?)
                     """, (
-                        h["id"], week_start, item,
+                        h["id"],
+                        week_start,
+                        item,
                         random.randint(10, 250),
-                        f"PL-{h['id']:02d}-{week_start}",
+                        f"PL-{h['id']:02d}-{week_start}-{item_index}",
                         "",
                     ))
                     pool_count += 1
@@ -115,32 +136,51 @@ def seed_demo_data(verbose=True):
                     VALUES (?,?,?,?)
                 """, (h["id"], year, month, "checked"))
 
-    # A handful of sample petty cash vouchers so that page isn't empty
+    # A handful of sample petty cash vouchers so that page is not empty.
     voucher_count = 0
+
     for i in range(6):
         category = random.choice(PETTY_CASH_CATEGORIES)
         amount = round(random.uniform(10, 150), 2)
         voucher_date = f"2025-{random.randint(1,3):02d}-{random.randint(1,27):02d}"
+
         cur = conn.execute("""
             INSERT INTO petty_cash_vouchers
               (voucher_date, required_for, category, passed_by, signature, notes, total_amount)
             VALUES (?,?,?,?,?,?,?)
         """, (
-            voucher_date, f"Sample expense {i + 1}", category,
-            "Demo Manager", "", "Sample data \u2014 not a real transaction", amount,
+            voucher_date,
+            f"Sample expense {i + 1}",
+            category,
+            "Demo Manager",
+            "",
+            "Sample data \u2014 not a real transaction",
+            amount,
         ))
+
         conn.execute("""
             INSERT INTO petty_cash_items (voucher_id, description, amount_gbp, gross, vat)
             VALUES (?,?,?,?,?)
-        """, (cur.lastrowid, f"{category} item", amount, amount, 0))
+        """, (
+            cur.lastrowid,
+            f"{category} item",
+            amount,
+            amount,
+            0,
+        ))
+
         voucher_count += 1
 
     conn.commit()
     conn.close()
 
     if verbose:
-        print(f"Created {result_count} weekly income entries, {pool_count} pool stock "
-              f"entries, and {voucher_count} petty cash vouchers across {len(months)} months.")
+        print(
+            f"Created {result_count} weekly income entries, "
+            f"{pool_count} pool stock entries, and "
+            f"{voucher_count} petty cash vouchers across {len(months)} months."
+        )
+
     return {
         "hotels": len(hotels),
         "daily_results": result_count,
