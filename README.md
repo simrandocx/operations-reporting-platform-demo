@@ -1,7 +1,13 @@
 # Operations Reporting Platform — Palace Laundry Workflow Prototype
 
 > **Disclaimer:** This is a demo portfolio project using sample/anonymised data only. It does not contain real company, customer, employee, financial or operational data.
+## Live Demo
 
+[Open the live demo](https://operations-reporting-dashboard-demo.onrender.com/app)
+
+> Note: This project is hosted on Render's free tier, so the first load may take up to 30–60 seconds if the service has been inactive.
+
+This is a public demo portfolio project using sample/anonymised data only. It does not contain real company, customer, employee, financial, or operational data.
 Inspired by real operational workflows in hospitality laundry operations, this project uses only synthetic sample data (see [backend/seed.py](backend/seed.py)) — no real company, customer, employee, financial, or operational data is included or ever stored.
 
 A full-stack internal-style management dashboard for hospitality laundry operations. The platform is designed to replace manual Excel workflows with structured data entry, automatic calculations, exportable reports, and backup support.
