@@ -1,0 +1,6 @@
+flask
+openpyxl
+pytesseract
+pillow
+python-dotenv
+gunicorn

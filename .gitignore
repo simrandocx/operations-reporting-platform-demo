@@ -1,0 +1,37 @@
+# Database and backups
+backend/*.db
+*.db
+*.db-journal
+backend/backups/
+backend/uploads/
+
+# Python
+venv/
+backend/venv/
+.venv/
+__pycache__/
+backend/__pycache__/
+*.pyc
+backend/*.pyc
+*.pyo
+*.pyd
+
+# Environment variables
+.env
+*.env
+!backend/.env.example
+
+# Mac
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Build/cache
+.cache/
+dist/
+build/
+node_modules/

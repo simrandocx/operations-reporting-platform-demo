@@ -1,0 +1,2951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Laundry Manager Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:       #1B3A6B;
+    --navy-mid:   #2A5298;
+    --sky:        #E8EFF9;
+    --sky-deep:   #C5D6F0;
+    --white:      #FFFFFF;
+    --ink:        #1A1A2E;
+    --ink-soft:   #4A4A6A;
+    --rule:       #DDE3EF;
+    --green:      #1A7A4A;
+    --green-bg:   #E6F5ED;
+    --amber:      #8B6000;
+    --amber-bg:   #FFF5D6;
+    --red:        #B91C1C;
+    --red-bg:     #FEE2E2;
+    --purple:     #6B21A8;
+    --purple-bg:  #F3E8FF;
+    --font-body:  'Inter', system-ui, sans-serif;
+    --font-mono:  'DM Mono', 'Courier New', monospace;
+    --radius:     6px;
+    --shadow:     0 1px 3px rgba(27,58,107,0.08), 0 1px 2px rgba(27,58,107,0.06);
+    --shadow-lg:  0 4px 12px rgba(27,58,107,0.12);
+  }
+
+  html, body { height: 100%; background: #F0F4FB; }
+  body { font-family: var(--font-body); color: var(--ink); font-size: 14px; line-height: 1.5; }
+
+  #root { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 220px; min-width: 220px; background: var(--navy);
+    display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh;
+    overflow-y: auto;
+  }
+  .sidebar-brand {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .brand-crown { font-size: 22px; margin-bottom: 4px; }
+  .brand-name { color: #fff; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; line-height: 1.2; }
+  .brand-sub  { color: rgba(255,255,255,0.5); font-size: 11px; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .sidebar-nav { padding: 12px 0; flex: 1; }
+  .nav-group-label {
+    padding: 10px 20px 4px;
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; color: rgba(255,255,255,0.35);
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 20px; cursor: pointer;
+    color: rgba(255,255,255,0.7); font-size: 13.5px; font-weight: 500;
+    transition: background 0.12s, color 0.12s;
+    border: none; background: none; width: 100%; text-align: left;
+  }
+  .nav-item:hover  { background: rgba(255,255,255,0.07); color: #fff; }
+  .nav-item.active { background: rgba(255,255,255,0.13); color: #fff; }
+  .nav-item .icon  { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+
+  .demo-banner {
+    margin: 12px 14px; padding: 10px 12px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; font-size: 11px; line-height: 1.5;
+    color: rgba(255,255,255,0.6);
+  }
+  .demo-banner strong { color: rgba(255,255,255,0.85); }
+  .demo-banner button {
+    margin-top: 8px; width: 100%; padding: 6px 8px; font-size: 11px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.8); border-radius: 6px; cursor: pointer;
+  }
+  .demo-banner button:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+  /* ── Main ── */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar {
+    background: var(--white); border-bottom: 1px solid var(--rule);
+    padding: 0 28px; height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .topbar-title { font-weight: 600; font-size: 16px; color: var(--ink); }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .month-picker {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--sky); border: 1px solid var(--sky-deep);
+    border-radius: var(--radius); padding: 5px 12px; font-size: 13px;
+    font-family: var(--font-body); color: var(--navy-mid); font-weight: 600;
+    cursor: pointer;
+  }
+  .month-picker select {
+    border: none; background: transparent; color: var(--navy-mid);
+    font-weight: 600; font-size: 13px; cursor: pointer; outline: none;
+  }
+
+  .page { padding: 28px; flex: 1; }
+  .page-header { margin-bottom: 24px; }
+  .page-title { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+  .page-sub { color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--white); border: 1px solid var(--rule);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  .card-header {
+    padding: 16px 20px 14px; border-bottom: 1px solid var(--rule);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-title { font-weight: 600; font-size: 14px; color: var(--ink); }
+  .card-body  { padding: 20px; }
+
+  /* ── KPI Grid ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr)); gap: 14px; margin-bottom: 24px; }
+  .kpi-card {
+    background: var(--white); border: 1px solid var(--rule);
+    border-radius: var(--radius); padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-soft); margin-bottom: 8px; }
+  .kpi-value { font-size: 26px; font-weight: 700; color: var(--navy); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .kpi-value.money::before { content: "£"; font-size: 18px; font-weight: 500; opacity: 0.7; }
+  .kpi-sub  { font-size: 11px; color: var(--ink-soft); margin-top: 4px; }
+  .kpi-badge { display: inline-block; font-size: 11px; font-weight: 600; border-radius: 4px; padding: 2px 7px; }
+
+  /* ── Table ── */
+  .tbl-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--sky); color: var(--navy); font-weight: 600; font-size: 11px;
+       text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 14px;
+       text-align: left; border-bottom: 2px solid var(--sky-deep); white-space: nowrap; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--rule); color: var(--ink); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #F7F9FD; }
+  td.num { font-family: var(--font-mono); text-align: right; font-size: 13px; }
+  td.total { font-weight: 700; color: var(--navy); }
+  .tfoot-row td { background: var(--sky); font-weight: 700; color: var(--navy); border-top: 2px solid var(--sky-deep); font-family: var(--font-mono); }
+
+  /* ── Inputs ── */
+  .input {
+    border: 1px solid var(--rule); border-radius: var(--radius);
+    padding: 7px 10px; font-size: 13px; font-family: var(--font-body);
+    color: var(--ink); background: var(--white); outline: none;
+    transition: border-color 0.15s;
+  }
+  .input:focus { border-color: var(--navy-mid); box-shadow: 0 0 0 3px rgba(42,82,152,0.1); }
+  .input-money { font-family: var(--font-mono); text-align: right; width: 110px; }
+  .input-sm { padding: 5px 8px; font-size: 12px; }
+  select.input { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234A4A6A' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+    padding-right: 28px; appearance: none; cursor: pointer; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: none; border-radius: var(--radius); padding: 8px 16px;
+    font-size: 13px; font-weight: 600; font-family: var(--font-body);
+    cursor: pointer; transition: all 0.12s; white-space: nowrap;
+  }
+  .btn-primary   { background: var(--navy); color: #fff; }
+  .btn-primary:hover   { background: var(--navy-mid); }
+  .btn-secondary { background: var(--sky); color: var(--navy); border: 1px solid var(--sky-deep); }
+  .btn-secondary:hover { background: var(--sky-deep); }
+  .btn-danger    { background: var(--red-bg); color: var(--red); border: 1px solid #FCA5A5; }
+  .btn-danger:hover    { background: #FEE2E2; }
+  .btn-success   { background: var(--green-bg); color: var(--green); border: 1px solid #86EFAC; }
+  .btn-sm        { padding: 5px 10px; font-size: 12px; }
+  .btn-xs        { padding: 3px 8px; font-size: 11px; }
+
+  /* ── Badges ── */
+  .badge { display: inline-flex; align-items: center; gap: 4px;
+           font-size: 11px; font-weight: 600; border-radius: 4px; padding: 2px 8px; white-space: nowrap; }
+  .badge-green   { background: var(--green-bg);  color: var(--green); }
+  .badge-amber   { background: var(--amber-bg);  color: var(--amber); }
+  .badge-red     { background: var(--red-bg);    color: var(--red); }
+  .badge-purple  { background: var(--purple-bg); color: var(--purple); }
+  .badge-navy    { background: var(--sky);       color: var(--navy); }
+  .badge-gray    { background: #F3F4F6; color: #6B7280; }
+
+  /* ── Alert ── */
+  .alert { border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px; display: flex; gap: 10px; font-size: 13px; }
+  .alert-warn  { background: var(--amber-bg); color: var(--amber); border: 1px solid #FCD34D; }
+  .alert-error { background: var(--red-bg);   color: var(--red);   border: 1px solid #FCA5A5; }
+  .alert-ok    { background: var(--green-bg); color: var(--green); border: 1px solid #86EFAC; }
+  .alert-info  { background: var(--sky);      color: var(--navy);  border: 1px solid var(--sky-deep); }
+
+  /* ── Forms ── */
+  .form-grid { display: grid; gap: 16px; }
+  .form-grid-2 { grid-template-columns: 1fr 1fr; }
+  .form-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .form-row { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+  .form-actions { display: flex; gap: 10px; margin-top: 8px; }
+
+  /* ── Modal ── */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
+  .modal { background: var(--white); border-radius: 8px; box-shadow: var(--shadow-lg); width: 500px; max-width: 96vw; max-height: 90vh; overflow-y: auto; }
+  .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--rule); display: flex; align-items: center; justify-content: space-between; }
+  .modal-title  { font-weight: 700; font-size: 16px; }
+  .modal-close  { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--ink-soft); line-height: 1; padding: 2px 6px; border-radius: 4px; }
+  .modal-close:hover { background: var(--sky); }
+  .modal-body   { padding: 24px; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid var(--rule); display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* ── Misc ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  .section-gap { margin-bottom: 24px; }
+  .mono { font-family: var(--font-mono); }
+  .text-right { text-align: right; }
+  .text-soft  { color: var(--ink-soft); }
+  .flex { display: flex; }
+  .flex-center { display: flex; align-items: center; }
+  .flex-between { display: flex; align-items: center; justify-content: space-between; }
+  .gap-8  { gap: 8px; }
+  .gap-12 { gap: 12px; }
+  .mt-16  { margin-top: 16px; }
+  .mt-20  { margin-top: 20px; }
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--sky-deep); border-top-color: var(--navy); border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty-state { text-align: center; padding: 48px 20px; color: var(--ink-soft); }
+  .empty-icon  { font-size: 36px; margin-bottom: 12px; }
+  .empty-title { font-weight: 600; font-size: 15px; color: var(--ink); margin-bottom: 6px; }
+  .pct-pos { color: var(--green); font-weight: 600; }
+  .pct-neg { color: var(--red);   font-weight: 600; }
+  .rank-strong  { color: var(--green);  font-weight: 700; }
+  .rank-stable  { color: var(--navy-mid); font-weight: 600; }
+  .rank-attention { color: var(--amber); font-weight: 700; }
+  .rank-new     { color: #6B7280; font-weight: 600; }
+
+  .status-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;
+  }
+  .dot-in_progress      { background: var(--amber); }
+  .dot-ready_for_checking { background: #60A5FA; }
+  .dot-checked          { background: #34D399; }
+  .dot-finalised        { background: var(--navy); }
+
+  @media (max-width: 900px) {
+    .sidebar { width: 60px; min-width: 60px; }
+    .brand-name, .brand-sub, .nav-item span, .nav-group-label { display: none; }
+    .nav-item { justify-content: center; padding: 12px; }
+    .sidebar-brand { padding: 14px; }
+    .brand-crown { margin-bottom: 0; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+const API = "";
+const MONTHS = ["","January","February","March","April","May","June",
+                "July","August","September","October","November","December"];
+const LINEN_ITEMS = [
+  "Single Sheets","Queen Sheets","King Sheets",
+  "Single Duvet Covers","Double Duvet Covers","Queen Duvet Covers","Emperor Duvet Covers",
+  "Emperor King Duvet Covers","Double Duvet Covers (for twins)","Queen Duvet Covers (Twin beds)",
+  "Queen Pillow Cases","King Pillow Cases",
+  "Single Bedspreads","Queen Bedspreads","King Bedspreads","Super King Bedspreads","Extra King Bedspreads",
+  "Scallop King Bedspreads","Escallop Single Bedspreads",
+  "Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Big Bath Mats","Face Cloths",
+  "Spa Jumbo Bath Sheets",
+  "Bathrobes","Bathrobes - Green","Bathrobes - Red","Bathrobes - Orange","Bathrobes - Blue Velour",
+  "Small Table Cloths 54X54","Medium Table Cloths 180X270","Large Table Cloths 54X54",
+  "Large Table Cloths 225X235","Large Round Table Cloths","Round Table Cloths",
+  "Satin Band Table Cloths 54X54","Ferguson Table Cloths 54X54","Ferguson Table Cloths 108X108",
+  "Old Style Table Cloth 54X54",
+  "FH Napkins","Ferguson Napkins","Ferguson Napkins (new)","Ferguson Napkins (old)",
+  "Old Style Table Napkins","Table Napkins","Pure Linen Napkins",
+  "Table Runners","Events Large Table Runners",
+  "Small Tray Cloths","Large Tray Cloths","Glass Cloths","Kitchen Cloths","Oven Cloths",
+];
+const STATUSES = ["in_progress","ready_for_checking","checked","finalised"];
+const STATUS_LABELS = {
+  in_progress: "In Progress", ready_for_checking: "Ready for Checking",
+  checked: "Checked", finalised: "Finalised"
+};
+
+async function api(path, opts={}) {
+  const res = await fetch(API + path, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+function fmt(n) {
+  if (n == null) return "—";
+  return "£" + Number(n).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtPct(n) {
+  if (n == null) return "—";
+  const s = n > 0 ? `+${n}%` : `${n}%`;
+  return <span className={n >= 0 ? "pct-pos" : "pct-neg"}>{s}</span>;
+}
+function fmtChange(n) {
+  if (n == null) return "—";
+  const s = (n >= 0 ? "+" : "") + fmt(n);
+  return <span className={n >= 0 ? "pct-pos" : "pct-neg"}>{s}</span>;
+}
+
+function StatusBadge({ status }) {
+  const cls = { in_progress:"badge-amber", ready_for_checking:"badge-navy",
+                checked:"badge-green", finalised:"badge-purple" }[status] || "badge-gray";
+  return <span className={`badge ${cls}`}>
+    <span className={`status-dot dot-${status}`}></span>
+    {STATUS_LABELS[status] || status}
+  </span>;
+}
+
+function LabelBadge({ label }) {
+  const cls = { Strong:"badge-green", Stable:"badge-navy", "Needs Attention":"badge-amber", New:"badge-gray" }[label] || "badge-gray";
+  return <span className={`badge ${cls}`}>{label}</span>;
+}
+
+function Toast({ msg, type, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, []);
+  const colors = { ok:"alert-ok", error:"alert-error", info:"alert-info" };
+  return (
+    <div style={{ position:"fixed", bottom:24, right:24, zIndex:999, maxWidth:360 }}>
+      <div className={`alert ${colors[type]||"alert-info"}`} style={{ boxShadow:"var(--shadow-lg)" }}>
+        <span>{type==="ok"?"✓":type==="error"?"✗":"ℹ"}</span>
+        <span style={{ flex:1 }}>{msg}</span>
+        <button onClick={onClose} style={{ background:"none",border:"none",cursor:"pointer",fontWeight:700,fontSize:16,opacity:0.6 }}>×</button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DASHBOARD
+// ─────────────────────────────────────────────────────────────────────────────
+function MiniBar({ value, max, color="#1B3A6B" }) {
+  const pct = max > 0 ? Math.min(100, Math.round(value / max * 100)) : 0;
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+      <div style={{ flex:1, height:6, background:"var(--rule)", borderRadius:3, overflow:"hidden" }}>
+        <div style={{ width:`${pct}%`, height:"100%", background:color, borderRadius:3, transition:"width 0.4s ease" }} />
+      </div>
+      <span style={{ fontSize:11, color:"var(--ink-soft)", minWidth:32, textAlign:"right" }}>{pct}%</span>
+    </div>
+  );
+}
+
+function Dashboard({ year, month, setPage }) {
+  const [summary, setSummary]     = useState(null);
+  const [prevSummary, setPrev]    = useState(null);
+  const [ranking, setRanking]     = useState(null);
+  const [poolSummary, setPool]    = useState(null);
+  const [recentStock, setRecent]  = useState([]);
+  const [backup, setBackup]       = useState(null);
+  const [statuses, setStatuses]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [activeTab, setActiveTab] = useState("revenue"); // "revenue" | "poolstock"
+
+  const prevYear  = month > 1 ? year : year - 1;
+  const prevMonth = month > 1 ? month - 1 : 12;
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      api(`/monthly-results/summary/${year}/${month}`),
+      api(`/monthly-results/summary/${prevYear}/${prevMonth}`),
+      api(`/analytics/ranking/${year}/${month}`),
+      api(`/pool-stock/summary/${year}/${month}`),
+      api(`/pool-stock?year=${year}&month=${month}`),
+      api("/backup/history"),
+      api(`/monthly-status/${year}/${month}`),
+    ]).then(([s, ps, r, pool, stock, bk, st]) => {
+      setSummary(s); setPrev(ps); setRanking(r);
+      setPool(pool); setRecent(stock.slice(0,6));
+      setBackup(bk); setStatuses(st);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [year, month]);
+
+  if (loading) return (
+    <div className="page" style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:400}}>
+      <div style={{textAlign:"center"}}>
+        <div className="spinner" style={{width:32,height:32,borderWidth:3,margin:"0 auto 12px"}}></div>
+        <div className="text-soft" style={{fontSize:13}}>Loading dashboard…</div>
+      </div>
+    </div>
+  );
+
+  const grandTotal   = summary?.grand_total || 0;
+  const prevTotal    = prevSummary?.grand_total || 0;
+  const totalChange  = grandTotal - prevTotal;
+  const totalChangePct = prevTotal ? round((totalChange / prevTotal) * 100, 1) : null;
+  const poolTotal    = poolSummary?.overall_total || 0;
+  const finalisedCount = statuses.filter(s => s.status === "finalised").length;
+  const totalHotels  = statuses.length || 10;
+  const maxRevenue   = ranking ? Math.max(...ranking.rankings.map(r => r.total_revenue), 1) : 1;
+
+  function round(n, d) { return Math.round(n * 10**d) / 10**d; }
+
+  const lastBackupStr = backup?.last_backup_at
+    ? new Date(backup.last_backup_at).toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})
+    : "Never";
+
+  const backupIsOld = () => {
+    if (!backup?.last_backup_at) return true;
+    const last = new Date(backup.last_backup_at);
+    const now  = new Date();
+    return (now - last) > 24 * 60 * 60 * 1000;
+  };
+
+  return (
+    <div className="page">
+      {/* ── Header ── */}
+      <div className="flex-between page-header">
+        <div>
+          <div className="page-title">Dashboard</div>
+          <div className="page-sub">{MONTHS[month]} {year} — Laundry Operations</div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          {backupIsOld() && (
+            <span className="badge badge-amber">⚠ Backup overdue</span>
+          )}
+          <span className="badge badge-navy">{finalisedCount}/{totalHotels} finalised</span>
+        </div>
+      </div>
+
+      {/* ── Top KPI row ── */}
+      <div className="kpi-grid section-gap">
+        <div className="kpi-card" style={{borderLeft:"4px solid var(--navy)"}}>
+          <div className="kpi-label">Total Revenue</div>
+          <div className="kpi-value money">{grandTotal.toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+          <div style={{marginTop:6,fontSize:12}}>
+            {totalChangePct !== null
+              ? <span className={totalChange >= 0 ? "pct-pos" : "pct-neg"}>
+                  {totalChange >= 0 ? "▲" : "▼"} {Math.abs(totalChangePct)}% vs {MONTHS[prevMonth]}
+                </span>
+              : <span className="text-soft">First month on record</span>
+            }
+          </div>
+        </div>
+        <div className="kpi-card" style={{borderLeft:"4px solid #34D399"}}>
+          <div className="kpi-label">Guest Laundry</div>
+          <div className="kpi-value money">{(summary?.total_guest||0).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+          <div style={{marginTop:8}}><MiniBar value={summary?.total_guest||0} max={grandTotal} color="#34D399" /></div>
+        </div>
+        <div className="kpi-card" style={{borderLeft:"4px solid #60A5FA"}}>
+          <div className="kpi-label">Staff Laundry</div>
+          <div className="kpi-value money">{(summary?.total_staff||0).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+          <div style={{marginTop:8}}><MiniBar value={summary?.total_staff||0} max={grandTotal} color="#60A5FA" /></div>
+        </div>
+        <div className="kpi-card" style={{borderLeft:"4px solid #A78BFA"}}>
+          <div className="kpi-label">Flat Laundry</div>
+          <div className="kpi-value money">{(summary?.total_flat||0).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+          <div style={{marginTop:8}}><MiniBar value={summary?.total_flat||0} max={grandTotal} color="#A78BFA" /></div>
+        </div>
+        <div className="kpi-card" style={{borderLeft:"4px solid #F59E0B"}}>
+          <div className="kpi-label">Pool Stock Items</div>
+          <div className="kpi-value" style={{color:"var(--amber)"}}>{poolTotal.toLocaleString()}</div>
+          <div className="kpi-sub" style={{marginTop:4}}>
+            {Object.keys(poolSummary?.by_hotel||{}).length} hotels this month
+          </div>
+        </div>
+      </div>
+
+      {/* ── Main two-column layout ── */}
+      <div className="grid-2 section-gap">
+
+        {/* Left — Hotel revenue chart + table with tabs */}
+        <div className="card" style={{gridColumn:"1 / 2"}}>
+          <div className="card-header">
+            <span className="card-title">Hotel Breakdown</span>
+            <div style={{display:"flex",gap:4}}>
+              {["revenue","poolstock"].map(tab => (
+                <button key={tab} className="btn btn-xs"
+                  style={{background: activeTab===tab?"var(--navy)":"var(--sky)", color: activeTab===tab?"#fff":"var(--navy)", border:"none"}}
+                  onClick={()=>setActiveTab(tab)}>
+                  {tab === "revenue" ? "💰 Revenue" : "🛏 Pool Stock"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{padding:"12px 20px"}}>
+            {activeTab === "revenue" && ranking && ranking.rankings.map(r => (
+              <div key={r.hotel_id} style={{marginBottom:14, cursor:"pointer"}}
+                onClick={()=>setPage("results")}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontSize:13,fontWeight:500}}>{r.hotel_name}</span>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <LabelBadge label={r.label} />
+                    <span style={{fontSize:13,fontWeight:700,fontFamily:"var(--font-mono)"}}>{fmt(r.total_revenue)}</span>
+                  </div>
+                </div>
+                <MiniBar value={r.total_revenue} max={maxRevenue}
+                  color={r.label==="Strong"?"#34D399":r.label==="Needs Attention"?"#F59E0B":"#60A5FA"} />
+              </div>
+            ))}
+            {activeTab === "poolstock" && poolSummary && (
+              Object.entries(poolSummary.by_hotel).length === 0
+                ? <div className="text-soft" style={{fontSize:13,padding:"20px 0"}}>No pool stock entries this month.</div>
+                : Object.entries(poolSummary.by_hotel)
+                    .sort((a,b) => b[1]-a[1])
+                    .map(([name, qty]) => (
+                  <div key={name} style={{marginBottom:14}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                      <span style={{fontSize:13,fontWeight:500}}>{name}</span>
+                      <span style={{fontSize:13,fontWeight:700,fontFamily:"var(--font-mono)"}}>{qty.toLocaleString()}</span>
+                    </div>
+                    <MiniBar value={qty} max={poolTotal} color="#F59E0B" />
+                  </div>
+                ))
+            )}
+          </div>
+        </div>
+
+        {/* Right column — status + recent stock + backup */}
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+
+          {/* Month Status */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">Month Status</span></div>
+            <div style={{padding:"12px 20px"}}>
+              {statuses.length === 0
+                ? <div className="text-soft" style={{fontSize:13}}>No entries this month yet.</div>
+                : statuses.sort((a,b)=>a.hotel_name?.localeCompare(b.hotel_name||"")||0).map(s => (
+                  <div key={s.hotel_id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"1px solid var(--rule)"}}>
+                    <span style={{fontSize:13}}>{s.hotel_name}</span>
+                    <StatusBadge status={s.status} />
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+
+          {/* Recent Pool Stock */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Recent Pool Stock</span>
+              <button className="btn btn-secondary btn-xs" onClick={()=>setPage("poolstock")}>View all</button>
+            </div>
+            <div style={{padding:"8px 20px"}}>
+              {recentStock.length === 0
+                ? <div className="text-soft" style={{fontSize:13,padding:"8px 0"}}>No pool stock entries yet.</div>
+                : recentStock.map(e => (
+                  <div key={e.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid var(--rule)"}}>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:500}}>{e.linen_item}</div>
+                      <div style={{fontSize:11,color:"var(--ink-soft)"}}>{e.hotel_name} · {e.entry_date}</div>
+                    </div>
+                    <span style={{fontFamily:"var(--font-mono)",fontSize:14,fontWeight:700,color:"var(--navy)"}}>{e.quantity}</span>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+
+          {/* Backup status */}
+          <div className="card" style={{borderLeft:`4px solid ${backupIsOld()?"var(--amber)":"#34D399"}`}}>
+            <div className="card-body">
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontWeight:600,fontSize:13,marginBottom:2}}>
+                    {backupIsOld() ? "⚠ Backup overdue" : "✓ Data backed up"}
+                  </div>
+                  <div className="text-soft" style={{fontSize:12}}>Last: {lastBackupStr}</div>
+                </div>
+                <button className="btn btn-sm btn-secondary" onClick={()=>setPage("exports")}>
+                  Back up now
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* ── Service breakdown row ── */}
+      {summary && prevSummary && (
+        <div className="card">
+          <div className="card-header"><span className="card-title">This Month vs Last Month — by Service</span></div>
+          <div style={{padding:"16px 20px",display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20}}>
+            {[
+              {label:"Guest Laundry", cur:summary.total_guest, prev:prevSummary.total_guest, color:"#34D399"},
+              {label:"Staff Laundry", cur:summary.total_staff, prev:prevSummary.total_staff, color:"#60A5FA"},
+              {label:"Flat Laundry",  cur:summary.total_flat,  prev:prevSummary.total_flat,  color:"#A78BFA"},
+            ].map(({label, cur, prev, color}) => {
+              const diff = cur - prev;
+              const pct  = prev ? round(diff/prev*100,1) : null;
+              return (
+                <div key={label} style={{padding:"14px 16px",background:"var(--sky)",borderRadius:6}}>
+                  <div style={{fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.07em",color:"var(--ink-soft)",marginBottom:6}}>{label}</div>
+                  <div style={{fontSize:22,fontWeight:700,color:"var(--navy)",marginBottom:4}}>{fmt(cur)}</div>
+                  <div style={{height:4,background:"var(--rule)",borderRadius:2,marginBottom:6}}>
+                    <div style={{height:"100%",width:`${prev?Math.min(100,cur/prev*100):0}%`,background:color,borderRadius:2,transition:"width 0.4s"}} />
+                  </div>
+                  <div style={{fontSize:12}}>
+                    {pct !== null
+                      ? <span className={diff>=0?"pct-pos":"pct-neg"}>{diff>=0?"▲":"▼"} {Math.abs(pct)}% vs {MONTHS[prevMonth]}</span>
+                      : <span className="text-soft">No prior month</span>
+                    }
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOTELS PAGE
+// ─────────────────────────────────────────────────────────────────────────────
+function HotelsPage({ toast }) {
+  const [hotels, setHotels] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name:"", customer_type:"hotel", active_status:1 });
+
+  const load = () => api("/hotels").then(setHotels);
+  useEffect(() => { load(); }, []);
+
+  const openNew = () => { setEditing(null); setForm({ name:"", customer_type:"hotel", active_status:1 }); setShowModal(true); };
+  const openEdit = h => { setEditing(h); setForm({ name:h.name, customer_type:h.customer_type, active_status:h.active_status }); setShowModal(true); };
+
+  const save = async () => {
+    try {
+      if (editing) await api(`/hotels/${editing.id}`, { method:"PATCH", body:form });
+      else await api("/hotels", { method:"POST", body:form });
+      toast("Saved.", "ok"); setShowModal(false); load();
+    } catch(e) { toast(e.message, "error"); }
+  };
+
+  const toggle = async h => {
+    await api(`/hotels/${h.id}`, { method:"PATCH", body:{ active_status: h.active_status ? 0 : 1 } });
+    load();
+  };
+
+  const hotels_active = hotels.filter(h => h.active_status);
+  const hotels_inactive = hotels.filter(h => !h.active_status);
+
+  return (
+    <div className="page">
+      <div className="flex-between page-header">
+        <div>
+          <div className="page-title">Hotels & Customers</div>
+          <div className="page-sub">{hotels_active.length} active — {hotels_inactive.length} inactive</div>
+        </div>
+        <button className="btn btn-primary" onClick={openNew}>+ Add customer</button>
+      </div>
+
+      <div className="card">
+        <div className="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {hotels.map(h => (
+                <tr key={h.id}>
+                  <td style={{fontWeight:500}}>{h.name}</td>
+                  <td>
+                    <span className={`badge ${h.customer_type==="hotel"?"badge-navy":"badge-purple"}`}>
+                      {h.customer_type==="hotel"?"Hotel":"Outside Contract"}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`badge ${h.active_status?"badge-green":"badge-gray"}`}>
+                      {h.active_status?"Active":"Inactive"}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="flex gap-8" style={{justifyContent:"flex-end"}}>
+                      <button className="btn btn-secondary btn-sm" onClick={()=>openEdit(h)}>Edit</button>
+                      <button className="btn btn-sm" style={{background:h.active_status?"var(--amber-bg)":"var(--green-bg)",color:h.active_status?"var(--amber)":"var(--green)",border:"none"}} onClick={()=>toggle(h)}>
+                        {h.active_status?"Deactivate":"Activate"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showModal && (
+        <div className="overlay" onClick={e => e.target===e.currentTarget&&setShowModal(false)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">{editing?"Edit customer":"Add customer"}</span>
+              <button className="modal-close" onClick={()=>setShowModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-grid">
+                <div className="form-row">
+                  <label className="form-label">Name</label>
+                  <input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="e.g. Hotel Name" />
+                </div>
+                <div className="form-row">
+                  <label className="form-label">Type</label>
+                  <select className="input" value={form.customer_type} onChange={e=>setForm({...form,customer_type:e.target.value})}>
+                    <option value="hotel">Hotel</option>
+                    <option value="outside_contract">Outside Contract</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={()=>setShowModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={save}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MONTHLY RESULTS — FAST ENTRY
+// ─────────────────────────────────────────────────────────────────────────────
+function MonthlyResultsPage({ year, month, toast }) {
+  const [hotels, setHotels]           = useState([]);
+  const [activeHotelId, setActiveHotelId] = useState(null);
+  const [weeks, setWeeks]             = useState([]);
+  const [saved, setSaved]             = useState({});
+  const [drafts, setDrafts]           = useState({});
+  const [saving, setSaving]           = useState({});
+  const [summary, setSummary]         = useState(null);
+  const [monthStatus, setMonthStatus] = useState({});
+  const [correctionPrompt, setCorrectionPrompt] = useState(null);
+  const [correctionText, setCorrectionText]     = useState("");
+  const [finaliseConfirm, setFinaliseConfirm]   = useState(false);
+  const [editingWeek, setEditingWeek] = useState(null);
+
+  const loadSchedule = useCallback(() => {
+    api(`/weekly-schedule/${year}/${month}`).then(d => setWeeks(d.weeks));
+  }, [year, month]);
+
+  const loadHotelData = useCallback(() => {
+    if (!activeHotelId) return;
+    Promise.all([
+      api(`/daily-results?hotel_id=${activeHotelId}&year=${year}&month=${month}`),
+      api(`/monthly-status/${year}/${month}`),
+    ]).then(([rows, statuses]) => {
+      const map = {};
+      rows.forEach(r => { map[r.entry_date] = r; });
+      setSaved(map);
+      setDrafts({});
+      const st = {};
+      statuses.forEach(s => { st[s.hotel_id] = s; });
+      setMonthStatus(st);
+    });
+  }, [activeHotelId, year, month]);
+
+  const loadAll = useCallback(() => {
+    Promise.all([api("/hotels"), api(`/monthly-results/summary/${year}/${month}`)]).then(([h, s]) => {
+      const active = h.filter(x => x.active_status);
+      setHotels(active);
+      setSummary(s);
+      if (!activeHotelId && active.length) setActiveHotelId(active[0].id);
+    });
+  }, [year, month]);
+
+  useEffect(() => { loadSchedule(); }, [loadSchedule]);
+  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => { loadHotelData(); }, [loadHotelData]);
+
+  const getVal = (weekStart, field) => {
+    if (drafts[weekStart]?.[field] !== undefined) return drafts[weekStart][field];
+    return saved[weekStart]?.[field] ?? "";
+  };
+
+  const setDraft = (weekStart, field, value) => {
+    setDrafts(d => ({ ...d, [weekStart]: { ...(d[weekStart]||{}), [field]: value } }));
+  };
+
+  const weekTotal = weekStart => {
+    const f = field => parseFloat(getVal(weekStart, field)) || 0;
+    return f("guest_laundry_income") + f("staff_laundry_income") + f("flat_laundry_income");
+  };
+
+  const monthTotal   = weeks.reduce((sum, w) => sum + weekTotal(w.week_start), 0);
+  const weeksEntered = weeks.filter(w => saved[w.week_start] || drafts[w.week_start]).length;
+  const dirtyCount   = Object.keys(drafts).length;
+  const activeStatus = monthStatus[activeHotelId]?.status || "in_progress";
+  const isFinalised  = activeStatus === "finalised";
+  const activeHotel  = hotels.find(h => h.id === activeHotelId);
+
+  const buildBody = (w, correctionNote) => {
+    const d  = drafts[w.week_start] || {};
+    const ex = saved[w.week_start]  || {};
+    return {
+      hotel_id:      activeHotelId,
+      entry_date:    d.week_start    || w.week_start,
+      week_end_date: d.week_end      || ex.week_end_date || w.week_end,
+      week_label:    d.week_label    || ex.week_label    || w.label,
+      guest_laundry_income: parseFloat(d.guest_laundry_income ?? ex.guest_laundry_income) || 0,
+      staff_laundry_income: parseFloat(d.staff_laundry_income ?? ex.staff_laundry_income) || 0,
+      flat_laundry_income:  parseFloat(d.flat_laundry_income  ?? ex.flat_laundry_income)  || 0,
+      ...(correctionNote ? { correction_note: correctionNote } : {}),
+    };
+  };
+
+  const saveWeek = async (w, correctionNote) => {
+    setSaving(s => ({ ...s, [w.week_start]: true }));
+    try {
+      await api("/daily-results", { method:"POST", body: buildBody(w, correctionNote) });
+      setDrafts(d => { const n={...d}; delete n[w.week_start]; return n; });
+      toast("Saved.", "ok");
+      loadHotelData(); loadAll();
+    } catch (e) {
+      if (e.message.includes("correction note")) {
+        setCorrectionPrompt({ weekStart: w.week_start, w });
+      } else { toast(e.message, "error"); }
+    }
+    setSaving(s => ({ ...s, [w.week_start]: false }));
+  };
+
+  const saveAll = async () => {
+    for (const w of weeks) { if (drafts[w.week_start]) await saveWeek(w); }
+  };
+
+  const confirmCorrection = async () => {
+    if (!correctionText.trim()) { toast("Please enter a correction note.", "error"); return; }
+    const w = weeks.find(wk => wk.week_start === correctionPrompt.weekStart);
+    await saveWeek(w, correctionText.trim());
+    setCorrectionPrompt(null); setCorrectionText("");
+  };
+
+  const updateMonthStatus = async (newStatus) => {
+    try {
+      await api("/monthly-status", { method:"POST", body:{ hotel_id: activeHotelId, year, month, status: newStatus } });
+      toast("Status updated.", "ok"); loadHotelData();
+    } catch (e) { toast(e.message, "error"); }
+  };
+
+  const handleStatusChange = s => s === "finalised" ? setFinaliseConfirm(true) : updateMonthStatus(s);
+  const confirmFinalise = () => { setFinaliseConfirm(false); updateMonthStatus("finalised"); };
+
+  const applyDateEdit = (weekStart, newStart, newEnd) => {
+    const d1 = new Date(newStart + "T00:00:00");
+    const d2 = new Date(newEnd   + "T00:00:00");
+    const label = d1.getMonth() === d2.getMonth()
+      ? `${d1.getDate()}\u2013${d2.getDate()} ${d1.toLocaleString("en-GB",{month:"short"})}`
+      : `${d1.getDate()} ${d1.toLocaleString("en-GB",{month:"short"})}\u2013${d2.getDate()} ${d2.toLocaleString("en-GB",{month:"short"})}`;
+    setDrafts(dd => ({ ...dd, [weekStart]: { ...(dd[weekStart]||{}), week_start: newStart, week_end: newEnd, week_label: label } }));
+    setEditingWeek(null);
+  };
+
+  return (
+    <div className="page">
+      <div className="flex-between page-header">
+        <div>
+          <div className="page-title">Monthly Results</div>
+          <div className="page-sub">{MONTHS[month]} {year} — enter weekly totals from LMC</div>
+        </div>
+        {dirtyCount > 0 && (
+          <button className="btn btn-primary" onClick={saveAll}>Save all ({dirtyCount} unsaved)</button>
+        )}
+      </div>
+
+      {summary && summary.missing_hotels.length > 0 && (
+        <div className="alert alert-warn section-gap">
+          ⚠ No entries yet for: <strong>{summary.missing_hotels.join(", ")}</strong>
+        </div>
+      )}
+
+      <div className="card section-gap" style={{ padding:"10px 14px" }}>
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+          {hotels.map(h => (
+            <button key={h.id} className="btn btn-sm"
+              style={{ background: h.id===activeHotelId?"var(--navy)":"var(--sky)", color: h.id===activeHotelId?"#fff":"var(--navy)", border:"none" }}
+              onClick={() => setActiveHotelId(h.id)}>
+              {h.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeHotel && (
+        <>
+          <div className="kpi-grid section-gap">
+            <div className="kpi-card">
+              <div className="kpi-label">{activeHotel.name} — Month Total</div>
+              <div className="kpi-value money">{monthTotal.toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+              <div className="kpi-sub">{weeksEntered} of {weeks.length} weeks entered</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Month Status</div>
+              <div style={{marginTop:4}}>
+                <select className="input" value={activeStatus} onChange={e=>handleStatusChange(e.target.value)}>
+                  {STATUSES.map(s=><option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {isFinalised && (
+            <div className="alert alert-info section-gap">
+              🔒 This month is finalised for {activeHotel.name}. Any edits will ask for a correction note.
+            </div>
+          )}
+
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Weekly Entries — {activeHotel.name}</span>
+              <span className="text-soft" style={{fontSize:12}}>Click a date range to adjust it</span>
+            </div>
+            <div className="tbl-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{minWidth:160}}>Week</th>
+                    <th style={{textAlign:"right",minWidth:120}}>Guest (£)</th>
+                    <th style={{textAlign:"right",minWidth:120}}>Staff (£)</th>
+                    <th style={{textAlign:"right",minWidth:120}}>Flat (£)</th>
+                    <th style={{textAlign:"right",minWidth:120}}>Week Total</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {weeks.map(w => {
+                    const isDirty  = !!drafts[w.week_start];
+                    const hasData  = !!saved[w.week_start];
+                    const curLabel = drafts[w.week_start]?.week_label || saved[w.week_start]?.week_label || w.label;
+                    const curStart = drafts[w.week_start]?.week_start || w.week_start;
+                    const curEnd   = drafts[w.week_start]?.week_end   || saved[w.week_start]?.week_end_date || w.week_end;
+                    return (
+                      <tr key={w.week_start} style={{ background: isDirty ? "#FFFBEB" : "transparent" }}>
+                        <td>
+                          {editingWeek === w.week_start ? (
+                            <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
+                              <input type="date" className="input input-sm" defaultValue={curStart}
+                                id={`ws-${w.week_start}`} style={{width:130}} />
+                              <span className="text-soft">–</span>
+                              <input type="date" className="input input-sm" defaultValue={curEnd}
+                                id={`we-${w.week_start}`} style={{width:130}} />
+                              <button className="btn btn-primary btn-xs" onClick={() => {
+                                const ns = document.getElementById(`ws-${w.week_start}`).value;
+                                const ne = document.getElementById(`we-${w.week_start}`).value;
+                                applyDateEdit(w.week_start, ns, ne);
+                              }}>✓</button>
+                              <button className="btn btn-secondary btn-xs" onClick={()=>setEditingWeek(null)}>✕</button>
+                            </div>
+                          ) : (
+                            <button className="btn btn-secondary btn-xs"
+                              style={{fontFamily:"var(--font-mono)",fontSize:12,letterSpacing:0}}
+                              onClick={()=>setEditingWeek(w.week_start)}>
+                              {curLabel}
+                            </button>
+                          )}
+                        </td>
+                        {["guest_laundry_income","staff_laundry_income","flat_laundry_income"].map(field => (
+                          <td key={field} style={{padding:"5px 8px"}}>
+                            <input type="number" step="0.01" min="0"
+                              className="input input-money input-sm"
+                              value={getVal(w.week_start, field)}
+                              onChange={e => setDraft(w.week_start, field, e.target.value)}
+                              placeholder="0.00" />
+                          </td>
+                        ))}
+                        <td className="num total">
+                          {hasData || isDirty ? fmt(weekTotal(w.week_start)) : "—"}
+                        </td>
+                        <td>
+                          {isDirty && (
+                            <button className="btn btn-primary btn-xs"
+                              onClick={()=>saveWeek(w)} disabled={saving[w.week_start]}>
+                              {saving[w.week_start] ? "…" : "Save"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="tfoot-row">
+                    <td><strong>MONTH TOTAL</strong></td>
+                    <td colSpan={3}></td>
+                    <td className="num">{fmt(monthTotal)}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {correctionPrompt && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setCorrectionPrompt(null)}>
+          <div className="modal" style={{width:420}}>
+            <div className="modal-header">
+              <span className="modal-title">Correction note required</span>
+              <button className="modal-close" onClick={()=>setCorrectionPrompt(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="text-soft" style={{marginBottom:12,fontSize:13}}>
+                This month is finalised. Briefly explain why you're changing this week's figures.
+              </p>
+              <textarea className="input" rows={3} style={{width:"100%",resize:"vertical"}}
+                value={correctionText} onChange={e=>setCorrectionText(e.target.value)}
+                placeholder="e.g. LMC report was corrected after a system error" />
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={()=>setCorrectionPrompt(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={confirmCorrection}>Save with correction note</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {finaliseConfirm && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setFinaliseConfirm(false)}>
+          <div className="modal" style={{width:420}}>
+            <div className="modal-header">
+              <span className="modal-title">Finalise this month?</span>
+              <button className="modal-close" onClick={()=>setFinaliseConfirm(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p style={{fontSize:13,lineHeight:1.6}}>
+                You're about to mark <strong>{MONTHS[month]} {year}</strong> as finalised for{" "}
+                <strong>{activeHotel?.name}</strong>.
+              </p>
+              <p className="text-soft" style={{fontSize:13,marginTop:10}}>
+                Once finalised, any further changes will require a correction note.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={()=>setFinaliseConfirm(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={confirmFinalise}>Yes, finalise this month</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POOL STOCK PAGE
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// QUICK ENTRY — one item at a time, keyboard only, for fast pool stock entry
+// ─────────────────────────────────────────────────────────────────────────────
+function QuickEntry({ hotel, date, items, onDone, toast }) {
+  const [idx, setIdx]       = useState(0);
+  const [values, setValues] = useState(() => Object.fromEntries(items.map(i => [i, ""])));
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (inputRef.current) inputRef.current.focus();
+  }, [idx]);
+
+  const current = items[idx];
+  const progress = Math.round((idx / items.length) * 100);
+  const entered  = Object.values(values).filter(v => v !== "").length;
+
+  const next = () => {
+    if (idx < items.length - 1) setIdx(i => i + 1);
+  };
+
+  const prev = () => {
+    if (idx > 0) setIdx(i => i - 1);
+  };
+
+  const handleKey = e => {
+    if (e.key === "Enter" || e.key === "ArrowRight") { e.preventDefault(); next(); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); prev(); }
+  };
+
+  const saveAll = async () => {
+    const toSave = items.filter(item => values[item] !== "" && parseInt(values[item]) > 0);
+    if (toSave.length === 0) { toast("No quantities entered.", "error"); return; }
+    setSaving(true);
+    let saved = 0;
+    for (const item of toSave) {
+      try {
+        await api("/pool-stock", { method:"POST", body: {
+          hotel_id:   hotel.id,
+          entry_date: date,
+          linen_item: item,
+          quantity:   parseInt(values[item]),
+          packing_list_ref: "",
+          notes: "Added via Quick Entry",
+        }});
+        saved++;
+      } catch(e) {
+        // skip duplicates silently, show others
+        if (!e.message.includes("Duplicate")) toast(`${item}: ${e.message}`, "error");
+      }
+    }
+    setSaving(false);
+    toast(`Saved ${saved} item(s).`, "ok");
+    onDone();
+  };
+
+  return (
+    <div style={{
+      position:"fixed", inset:0, background:"var(--navy)", zIndex:300,
+      display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+    }}>
+      {/* Header */}
+      <div style={{ position:"absolute", top:0, left:0, right:0, padding:"20px 28px",
+        display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div>
+          <div style={{ color:"rgba(255,255,255,0.6)", fontSize:12, marginBottom:2 }}>
+            Quick Entry — {hotel.name} · {date}
+          </div>
+          <div style={{ color:"rgba(255,255,255,0.4)", fontSize:11 }}>
+            {entered} of {items.length} items entered · Press Enter to advance
+          </div>
+        </div>
+        <button onClick={onDone} style={{ background:"rgba(255,255,255,0.1)", border:"none",
+          color:"#fff", borderRadius:6, padding:"8px 16px", cursor:"pointer", fontSize:13 }}>
+          Exit
+        </button>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:"rgba(255,255,255,0.1)" }}>
+        <div style={{ height:"100%", background:"#34D399", width:`${progress}%`, transition:"width 0.2s" }} />
+      </div>
+
+      {/* Item counter */}
+      <div style={{ color:"rgba(255,255,255,0.4)", fontSize:13, marginBottom:16 }}>
+        {idx + 1} / {items.length}
+      </div>
+
+      {/* Current item */}
+      <div style={{ color:"#fff", fontSize:32, fontWeight:700, marginBottom:8,
+        textAlign:"center", maxWidth:500, letterSpacing:"-0.02em" }}>
+        {current}
+      </div>
+
+      {/* Input */}
+      <input
+        ref={inputRef}
+        type="number" min="0"
+        value={values[current]}
+        onChange={e => setValues(v => ({ ...v, [current]: e.target.value }))}
+        onKeyDown={handleKey}
+        placeholder="0"
+        style={{
+          fontSize:56, fontWeight:700, textAlign:"center",
+          background:"rgba(255,255,255,0.1)", border:"2px solid rgba(255,255,255,0.3)",
+          borderRadius:12, color:"#fff", width:220, padding:"12px 20px",
+          outline:"none", fontFamily:"var(--font-mono)", marginBottom:24,
+          caretColor:"#34D399",
+        }}
+      />
+
+      {/* Nav buttons */}
+      <div style={{ display:"flex", gap:12, marginBottom:40 }}>
+        <button onClick={prev} disabled={idx===0}
+          style={{ background:"rgba(255,255,255,0.1)", border:"none", color:"#fff",
+            borderRadius:8, padding:"12px 28px", fontSize:15, cursor:"pointer",
+            opacity: idx===0 ? 0.3 : 1 }}>
+          ← Back
+        </button>
+        {idx < items.length - 1 ? (
+          <button onClick={next}
+            style={{ background:"#34D399", border:"none", color:"#fff",
+              borderRadius:8, padding:"12px 28px", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+            Next →
+          </button>
+        ) : (
+          <button onClick={saveAll} disabled={saving}
+            style={{ background:"#34D399", border:"none", color:"#fff",
+              borderRadius:8, padding:"12px 28px", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+            {saving ? "Saving…" : "✓ Save all"}
+          </button>
+        )}
+      </div>
+
+      {/* Item dots */}
+      <div style={{ display:"flex", gap:4, flexWrap:"wrap", maxWidth:480, justifyContent:"center" }}>
+        {items.map((item, i) => (
+          <button key={item} onClick={() => setIdx(i)}
+            title={item}
+            style={{
+              width:10, height:10, borderRadius:"50%", border:"none", cursor:"pointer",
+              background: i === idx ? "#fff"
+                : values[item] !== "" ? "#34D399"
+                : "rgba(255,255,255,0.2)",
+              transition:"background 0.15s",
+            }} />
+        ))}
+      </div>
+
+      <div style={{ color:"rgba(255,255,255,0.3)", fontSize:11, marginTop:20 }}>
+        ← → arrow keys or Enter to navigate · leave blank to skip
+      </div>
+    </div>
+  );
+}
+
+function PoolStockPage({ year, month, toast }) {
+  const [entries, setEntries] = useState([]);
+  const [hotels, setHotels] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ hotel_id:"", entry_date:"", linen_item:"", quantity:"", packing_list_ref:"", notes:"" });
+  const [editing, setEditing] = useState(null);
+  const [filter, setFilter] = useState({ hotel_id:"", linen_item:"", ref:"", date:"" });
+
+  // Quick entry state
+  const [quickEntry, setQuickEntry] = useState(null); // { hotel, date, items }
+  const [quickForm, setQuickForm] = useState({ hotel_id:"", entry_date:"" });
+  const [showQuickSetup, setShowQuickSetup] = useState(false);
+
+  // Photo scan state
+  const [showScanUpload, setShowScanUpload] = useState(false);
+  const [scanForm, setScanForm] = useState({ hotel_id:"", entry_date:"" });
+  const [scanFile, setScanFile] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [reviewScan, setReviewScan] = useState(null);
+
+  const load = useCallback(() => {
+    const p = new URLSearchParams({ year, month });
+    if (filter.hotel_id) p.set("hotel_id", filter.hotel_id);
+    if (filter.linen_item) p.set("linen_item", filter.linen_item);
+    if (filter.ref) p.set("packing_list_ref", filter.ref);
+    if (filter.date) p.set("entry_date", filter.date);
+    Promise.all([
+      api(`/pool-stock?${p}`),
+      api("/hotels"),
+      api(`/pool-stock/summary/${year}/${month}`),
+    ]).then(([e, h, s]) => {
+      setEntries(e); setHotels(h.filter(x=>x.active_status)); setSummary(s);
+    });
+  }, [year, month, filter]);
+  useEffect(() => { load(); }, [load]);
+
+  const openNew = () => {
+    setEditing(null);
+    setForm({ hotel_id:"", entry_date:`${year}-${String(month).padStart(2,"0")}-01`, linen_item:"", quantity:"", packing_list_ref:"", notes:"" });
+    setShowModal(true);
+  };
+  const openEdit = e => { setEditing(e); setForm({ hotel_id:e.hotel_id, entry_date:e.entry_date, linen_item:e.linen_item, quantity:e.quantity, packing_list_ref:e.packing_list_ref, notes:e.notes }); setShowModal(true); };
+
+  const save = async () => {
+    const body = { ...form, hotel_id:parseInt(form.hotel_id), quantity:parseInt(form.quantity) };
+    try {
+      if (editing) await api(`/pool-stock/${editing.id}`, { method:"PATCH", body });
+      else await api("/pool-stock", { method:"POST", body });
+      toast("Saved.", "ok"); setShowModal(false); load();
+    } catch(e) { toast(e.message, "error"); }
+  };
+
+  const del = async id => {
+    if (!confirm("Delete this entry?")) return;
+    await api(`/pool-stock/${id}`, { method:"DELETE" });
+    toast("Deleted.", "ok"); load();
+  };
+
+  // ── Photo scan flow ──────────────────────────────────────────────────────
+
+  const openScanUpload = () => {
+    setScanForm({ hotel_id:"", entry_date:`${year}-${String(month).padStart(2,"0")}-01` });
+    setScanFile(null);
+    setShowScanUpload(true);
+  };
+
+  const openQuickEntry = () => {
+    setQuickForm({ hotel_id: hotels[0]?.id || "", entry_date:`${year}-${String(month).padStart(2,"0")}-01` });
+    setShowQuickSetup(true);
+  };
+
+  const HOTEL_TEMPLATES_JS = {
+    "Hotel A": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","Emperor King Duvet Covers","Queen Pillow Cases","King Pillow Cases","Scallop King Bedspreads","Escallop Single Bedspreads","Queen Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes - Green","Small Table Cloths 54x54","Round Table Cloths","Large Table Cloths 225x235","FH Napkins","Table Runners","Events Large Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Oven Cloths"],
+    "Hotel B": ["Single Sheets","Single Duvet Covers","Emperor King Duvet Covers","Double Duvet Covers","King Sheets","Queen Pillow Cases","Single Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Spa Jumbo Bath Sheets","Bathrobes","Ferguson Table Cloths 54X54","Ferguson Napkins","Old Style Table Napkins","Old Style Table Cloth 54X54","Large Table Cloths 225X235","Round Table Cloths","FH Napkins","Small Tray Cloths","Large Tray Cloths","Ferguson Round Table Cloths","Medium Table Cloths 180X270","Glass Cloths","Oven Cloths"],
+    "Hotel C": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Queen Duvet Covers","Emperor Duvet Covers","Double Duvet Covers","Queen Pillow Cases","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes","Small Table Cloths 54X54","Medium Table Cloths 180X270","Large Round Table Cloths","Table Napkins","FH Napkins","Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Oven Cloths"],
+    "Hotel D": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","Queen Duvet Covers","Emperor Duvet Covers","Queen Pillow Cases","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes - Orange","Small Table Cloths 54X54","Medium Table Cloths 180X270","Large Round Table Cloths","Large Table Cloths 225X235","FH Napkins","Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Kitchen Cloths","Oven Cloths"],
+    "Hotel E": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","King Duvet Covers","Emperor Duvet Covers","Queen Pillow Cases","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes - Red","Ferguson Table Cloths 54X54","Ferguson Table Cloths 108X108","Ferguson Napkins (new)","Ferguson Napkins (old)","Round Table Cloths","Large Table Cloths 225X235","FH Napkins","Table Runners","Small Tray Cloths","Glass Cloths","Oven Cloths"],
+    "Hotel F": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Queen Duvet Covers","King Duvet Covers","Emperor Duvet Covers","Double Duvet Covers (for twins)","King Pillow Cases","Queen Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Super King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Big Bath Mats","Face Cloths","Bathrobes - Red","FH Napkins","Small Tray Cloths","Large Tray Cloths","Table Runners","Kitchen Cloths","Oven Cloths"],
+    "Hotel G": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","Queen Duvet Covers","Emperor Duvet Covers","Queen Duvet Covers (Twin beds)","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Extra King Bedspreads","Hand Towels","Bath Towels","Face Cloths","Bath Mats","Bath Sheets","Bathrobes - Blue Velour","Satin Band Table Cloths 54X54","Large Table Cloths 54X54","Large Round Table Cloths","Large Table Cloths 225X235","FH Napkins","Pure Linen Napkins","Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Kitchen Cloths","Oven Cloths"],
+    "Hotel H": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","Emperor King Duvet Covers","Queen Pillow Cases","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes - Green","Small Table Cloths 54X54","Medium Table Cloths 180X270","Large Round Table Cloths","Large Table Cloths 225X235","FH Napkins","Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Oven Cloths"],
+  };
+
+  const _getHotelTemplate = (hotelName) => {
+    for (const [key, items] of Object.entries(HOTEL_TEMPLATES_JS)) {
+      if (key.toLowerCase().includes(hotelName.toLowerCase().split(" ")[0]) ||
+          hotelName.toLowerCase().includes(key.toLowerCase().split(" ")[0])) {
+        return items;
+      }
+    }
+    return LINEN_ITEMS;
+  };
+
+  const startQuickEntry = () => {
+    const hotel = hotels.find(h => String(h.id) === String(quickForm.hotel_id));
+    if (!hotel) { toast("Please select a hotel.", "error"); return; }
+    if (!quickForm.entry_date) { toast("Please pick a date.", "error"); return; }
+    setShowQuickSetup(false);
+    setQuickEntry({ hotel, date: quickForm.entry_date, items: _getHotelTemplate(hotel.name) });
+  };
+
+  const runScan = async () => {
+    if (!scanForm.hotel_id || !scanForm.entry_date) {
+      toast("Please choose a hotel and date first.", "error"); return;
+    }
+    if (!scanFile) {
+      toast("Please choose a photo to scan.", "error"); return;
+    }
+    setScanning(true);
+    try {
+      const formData = new FormData();
+      formData.append("hotel_id", scanForm.hotel_id);
+      formData.append("entry_date", scanForm.entry_date);
+      formData.append("image", scanFile);
+      const res = await fetch(`${API}/pool-stock/scan`, { method:"POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Scan failed.");
+
+      // Backend now returns pre_filled_rows with the correct hotel-specific item
+      // names already matched in order. Much more reliable than guessing from OCR text.
+      const rows = data.pre_filled_rows.map(r => ({
+        linen_item: r.linen_item,
+        quantity: r.quantity !== "" ? r.quantity : "",
+        ocr_confidence: r.ocr_confidence,
+      }));
+
+      setReviewScan({
+        scan_id: data.scan_id,
+        hotel_id: scanForm.hotel_id,
+        hotel_name: data.hotel_name,
+        entry_date: scanForm.entry_date,
+        rows,
+        warning: data.warning,
+        using_template: data.using_hotel_template,
+        ocr_numbers_found: data.ocr_numbers_found,
+        template_count: data.template_item_count,
+        knownItems: LINEN_ITEMS,
+      });
+      setShowScanUpload(false);
+    } catch (e) {
+      toast(e.message, "error");
+    }
+    setScanning(false);
+  };
+
+  const updateReviewRow = (idx, field, value) => {
+    setReviewScan(rs => {
+      const rows = [...rs.rows];
+      rows[idx] = { ...rows[idx], [field]: value };
+      return { ...rs, rows };
+    });
+  };
+
+  const removeReviewRow = idx => {
+    setReviewScan(rs => ({ ...rs, rows: rs.rows.filter((_,i) => i!==idx) }));
+  };
+
+  const addReviewRow = () => {
+    setReviewScan(rs => ({ ...rs, rows: [...rs.rows, { linen_item:"", quantity:"", ocr_confidence:"manual" }] }));
+  };
+
+  const confirmScan = async () => {
+    const validRows = reviewScan.rows.filter(r => r.linen_item && r.quantity);
+    if (validRows.length === 0) {
+      toast("Add at least one item with a quantity before saving.", "error"); return;
+    }
+    try {
+      const result = await api(`/pool-stock/scan/${reviewScan.scan_id}/confirm`, {
+        method: "POST",
+        body: { items: validRows.map(r => ({ linen_item: r.linen_item, quantity: parseInt(r.quantity) })) }
+      });
+      toast(`Saved ${result.items_saved} item(s) from the scan.`, "ok");
+      setReviewScan(null);
+      load();
+    } catch (e) { toast(e.message, "error"); }
+  };
+
+  const discardScan = async () => {
+    if (!confirm("Discard this scan? Nothing will be saved.")) return;
+    await api(`/pool-stock/scan/${reviewScan.scan_id}/discard`, { method: "POST" });
+    toast("Scan discarded.", "ok");
+    setReviewScan(null);
+  };
+
+  return (
+    <div className="page">
+      {quickEntry && (
+        <QuickEntry
+          hotel={quickEntry.hotel}
+          date={quickEntry.date}
+          items={quickEntry.items}
+          toast={toast}
+          onDone={() => { setQuickEntry(null); load(); }}
+        />
+      )}
+
+      <div className="flex-between page-header">
+        <div>
+          <div className="page-title">Pool Stock</div>
+          <div className="page-sub">{MONTHS[month]} {year} — {summary?.overall_total?.toLocaleString()||0} items total</div>
+        </div>
+        <div className="flex gap-8">
+          <button className="btn btn-primary" onClick={openQuickEntry}>⚡ Quick Entry</button>
+          <button className="btn btn-secondary" onClick={openScanUpload}>📷 Scan</button>
+          <button className="btn btn-secondary" onClick={openNew}>+ Add entry</button>
+        </div>
+      </div>
+
+      {showQuickSetup && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShowQuickSetup(false)}>
+          <div className="modal" style={{width:420}}>
+            <div className="modal-header">
+              <span className="modal-title">⚡ Quick Entry</span>
+              <button className="modal-close" onClick={()=>setShowQuickSetup(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="text-soft" style={{fontSize:13,marginBottom:16}}>
+                Enter all items for one hotel in one go — one item at a time, full screen, keyboard only. Press Enter to move to the next item.
+              </p>
+              <div className="form-grid form-grid-2">
+                <div className="form-row">
+                  <label className="form-label">Hotel</label>
+                  <select className="input" value={quickForm.hotel_id}
+                    onChange={e=>setQuickForm({...quickForm, hotel_id:e.target.value})}>
+                    <option value="">Select…</option>
+                    {hotels.map(h=><option key={h.id} value={h.id}>{h.name}</option>)}
+                  </select>
+                </div>
+                <div className="form-row">
+                  <label className="form-label">Date</label>
+                  <input type="date" className="input" value={quickForm.entry_date}
+                    onChange={e=>setQuickForm({...quickForm, entry_date:e.target.value})} />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={()=>setShowQuickSetup(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={startQuickEntry}>Start →</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {summary && Object.keys(summary.checks.duplicate_packing_list_refs||{}).length > 0 && (
+        <div className="alert alert-warn section-gap">
+          ⚠ Duplicate packing list references detected: {Object.keys(summary.checks.duplicate_packing_list_refs).join(", ")}
+        </div>
+      )}
+
+      {summary && (
+        <div className="grid-2 section-gap">
+          <div className="card">
+            <div className="card-header"><span className="card-title">By Hotel</span></div>
+            <div className="tbl-wrap">
+              <table>
+                <thead><tr><th>Hotel</th><th style={{textAlign:"right"}}>Items</th></tr></thead>
+                <tbody>
+                  {Object.entries(summary.by_hotel).map(([name,qty])=>(
+                    <tr key={name}><td>{name}</td><td className="num mono">{qty.toLocaleString()}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-header"><span className="card-title">By Linen Item</span></div>
+            <div className="tbl-wrap">
+              <table>
+                <thead><tr><th>Item</th><th style={{textAlign:"right"}}>Quantity</th></tr></thead>
+                <tbody>
+                  {Object.entries(summary.by_linen_item).map(([name,qty])=>(
+                    <tr key={name}><td>{name}</td><td className="num mono">{qty.toLocaleString()}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">All Entries</span>
+          <div className="flex gap-8" style={{flexWrap:"wrap"}}>
+            <input type="date" className="input input-sm"
+              value={filter.date}
+              onChange={e=>setFilter({...filter, date:e.target.value})}
+              title="Filter by exact date" />
+            {filter.date && (
+              <button className="btn btn-secondary btn-xs" onClick={()=>setFilter({...filter,date:""})}>
+                Clear date
+              </button>
+            )}
+            <select className="input input-sm" value={filter.hotel_id} onChange={e=>setFilter({...filter,hotel_id:e.target.value})}>
+              <option value="">All hotels</option>
+              {hotels.map(h=><option key={h.id} value={h.id}>{h.name}</option>)}
+            </select>
+            <select className="input input-sm" value={filter.linen_item} onChange={e=>setFilter({...filter,linen_item:e.target.value})}>
+              <option value="">All items</option>
+              {LINEN_ITEMS.map(i=><option key={i} value={i}>{i}</option>)}
+            </select>
+            <input className="input input-sm" placeholder="Ref…" value={filter.ref} onChange={e=>setFilter({...filter,ref:e.target.value})} style={{width:100}} />
+          </div>
+        </div>
+        <div className="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Hotel</th><th>Linen Item</th>
+                <th style={{textAlign:"right"}}>Qty</th>
+                <th>Packing List Ref</th><th>Notes</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.length === 0 && (
+                <tr><td colSpan={6}><div className="empty-state"><div className="empty-icon">📦</div><div className="empty-title">No entries yet</div><div>Use Quick Entry or Add entry above.</div></div></td></tr>
+              )}
+              {(() => {
+                // Group entries by date and render with date header rows
+                const groups = [];
+                let currentDate = null;
+                entries.forEach(e => {
+                  if (e.entry_date !== currentDate) {
+                    currentDate = e.entry_date;
+                    const d = new Date(e.entry_date + "T00:00:00");
+                    const label = d.toLocaleDateString("en-GB", { weekday:"short", day:"numeric", month:"long", year:"numeric" });
+                    groups.push({ type:"date", date: e.entry_date, label });
+                  }
+                  groups.push({ type:"entry", entry: e });
+                });
+                return groups.map((g, i) => {
+                  if (g.type === "date") return (
+                    <tr key={`date-${g.date}`}>
+                      <td colSpan={6} style={{
+                        background:"var(--sky)", fontWeight:700, fontSize:12,
+                        color:"var(--navy)", padding:"8px 14px", letterSpacing:"0.04em",
+                        textTransform:"uppercase", borderTop: i > 0 ? "2px solid var(--sky-deep)" : "none"
+                      }}>
+                        {g.label}
+                      </td>
+                    </tr>
+                  );
+                  const e = g.entry;
+                  return (
+                    <tr key={e.id}>
+                      <td>{e.hotel_name}</td>
+                      <td>{e.linen_item}</td>
+                      <td className="num mono">{e.quantity}</td>
+                      <td className="mono" style={{fontSize:12}}>{e.packing_list_ref||"—"}</td>
+                      <td className="text-soft">{e.notes||"—"}</td>
+                      <td>
+                        <div className="flex gap-8">
+                          <button className="btn btn-secondary btn-xs" onClick={()=>openEdit(e)}>Edit</button>
+                          <button className="btn btn-danger btn-xs" onClick={()=>del(e.id)}>Del</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                });
+              })()}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showModal && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShowModal(false)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">{editing?"Edit entry":"Add pool stock entry"}</span>
+              <button className="modal-close" onClick={()=>setShowModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-grid form-grid-2">
+                <div className="form-row">
+                  <label className="form-label">Hotel</label>
+                  <select className="input" value={form.hotel_id} onChange={e=>setForm({...form,hotel_id:e.target.value})}>
+                    <option value="">Select…</option>
+                    {hotels.map(h=><option key={h.id} value={h.id}>{h.name}</option>)}
+                  </select>
+                </div>
+                <div className="form-row">
+                  <label className="form-label">Date</label>
+                  <input type="date" className="input" value={form.entry_date} onChange={e=>setForm({...form,entry_date:e.target.value})} />
+                </div>
+                <div className="form-row">
+                  <label className="form-label">Linen Item</label>
+                  <select className="input" value={form.linen_item} onChange={e=>setForm({...form,linen_item:e.target.value})}>
+                    <option value="">Select…</option>
+                    {LINEN_ITEMS.map(i=><option key={i} value={i}>{i}</option>)}
+                  </select>
+                </div>
+                <div className="form-row">
+                  <label className="form-label">Quantity</label>
+                  <input type="number" min="0" className="input" value={form.quantity} onChange={e=>setForm({...form,quantity:e.target.value})} />
+                </div>
+                <div className="form-row">
+                  <label className="form-label">Packing List Ref</label>
+                  <input className="input" value={form.packing_list_ref} onChange={e=>setForm({...form,packing_list_ref:e.target.value})} placeholder="e.g. PL-01-2503-12" />
+                </div>
+                <div className="form-row">
+                  <label className="form-label">Notes</label>
+                  <input className="input" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="Optional" />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={()=>setShowModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={save}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 1: upload a photo of the packing list */}
+      {showScanUpload && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShowScanUpload(false)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">📷 Scan a packing list</span>
+              <button className="modal-close" onClick={()=>setShowScanUpload(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="text-soft" style={{fontSize:13, marginBottom:16}}>
+                Upload a photo of the filled-in packing list. The system will read the numbers
+                and show them to you on the next screen — nothing is saved until you confirm it looks right.
+              </p>
+              <div className="form-grid form-grid-2">
+                <div className="form-row">
+                  <label className="form-label">Hotel</label>
+                  <select className="input" value={scanForm.hotel_id} onChange={e=>setScanForm({...scanForm,hotel_id:e.target.value})}>
+                    <option value="">Select…</option>
+                    {hotels.map(h=><option key={h.id} value={h.id}>{h.name}</option>)}
+                  </select>
+                </div>
+                <div className="form-row">
+                  <label className="form-label">Date</label>
+                  <input type="date" className="input" value={scanForm.entry_date} onChange={e=>setScanForm({...scanForm,entry_date:e.target.value})} />
+                </div>
+              </div>
+              <div className="form-row" style={{marginTop:16}}>
+                <label className="form-label">Photo</label>
+                <input type="file" accept="image/*" className="input"
+                  onChange={e=>setScanFile(e.target.files[0])} />
+                {scanFile && (
+                  <div style={{marginTop:10}}>
+                    <img src={URL.createObjectURL(scanFile)} alt="Preview"
+                      style={{maxWidth:"100%", maxHeight:200, borderRadius:6, border:"1px solid var(--rule)"}} />
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={()=>setShowScanUpload(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={runScan} disabled={scanning}>
+                {scanning ? "Scanning…" : "Scan photo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: review and correct what was detected before saving */}
+      {reviewScan && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&null}>
+          <div className="modal" style={{ width: 660 }}>
+            <div className="modal-header">
+              <span className="modal-title">Review scanned items — {reviewScan.hotel_name}</span>
+              <button className="modal-close" onClick={discardScan}>×</button>
+            </div>
+            <div className="modal-body">
+              {reviewScan.warning && (
+                <div className="alert alert-warn" style={{marginBottom:16}}>⚠ {reviewScan.warning}</div>
+              )}
+              {reviewScan.using_template && (
+                <div className="alert alert-ok" style={{marginBottom:14}}>
+                  ✓ Using {reviewScan.hotel_name}'s template — item names are pre-filled in the correct order.
+                  Just check the quantities and correct any misread numbers.
+                </div>
+              )}
+              <p className="text-soft" style={{fontSize:13, marginBottom:14}}>
+                Item names are filled in from the hotel's known packing list.
+                Check each quantity — correct any that look wrong, leave blank any items that weren't packed today.
+                Nothing saves until you click Confirm.
+              </p>
+              <div className="tbl-wrap" style={{ maxHeight:420, overflowY:"auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th style={{minWidth:220}}>Linen Item</th>
+                      <th style={{textAlign:"right", minWidth:120}}>Quantity Packed</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reviewScan.rows.map((row, idx) => (
+                      <tr key={idx} style={{ background: row.quantity === "" ? "#FFFBEB" : "transparent" }}>
+                        <td>
+                          {row.ocr_confidence === "manual" ? (
+                            <select className="input input-sm" value={row.linen_item}
+                              onChange={e=>updateReviewRow(idx,"linen_item",e.target.value)}>
+                              <option value="">Select item…</option>
+                              {LINEN_ITEMS.map(i=><option key={i} value={i}>{i}</option>)}
+                            </select>
+                          ) : (
+                            <span style={{fontSize:13, fontWeight:500}}>{row.linen_item}</span>
+                          )}
+                        </td>
+                        <td style={{padding:"5px 8px"}}>
+                          <input type="number" min="0" className="input input-money input-sm"
+                            value={row.quantity}
+                            placeholder="0"
+                            onChange={e=>updateReviewRow(idx,"quantity",e.target.value)} />
+                        </td>
+                        <td>
+                          <button className="btn btn-danger btn-xs" onClick={()=>removeReviewRow(idx)}>✕</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button className="btn btn-secondary btn-sm" style={{marginTop:12}} onClick={addReviewRow}>
+                + Add a missed item
+              </button>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-danger" onClick={discardScan}>Discard scan</button>
+              <button className="btn btn-primary" onClick={confirmScan}>Confirm and save</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPARISON PAGE
+// ─────────────────────────────────────────────────────────────────────────────
+function ComparisonPage({ year, month }) {
+  const [hotels, setHotels] = useState([]);
+  const [messages, setMessages] = useState([
+    { role: "system", text: "Tap a question below to get started." }
+  ]);
+  const [activeQuestion, setActiveQuestion] = useState(null); // which preset is being configured
+  const [form, setForm] = useState({}); // answers being filled in for the active question
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => { api("/hotels").then(h => setHotels(h.filter(x=>x.active_status))); }, []);
+
+  const todayStr = `${year}-${String(month).padStart(2,"0")}-01`;
+
+  const PRESETS = [
+    {
+      id: "hotel_month",
+      label: "How did a hotel do in a given month?",
+      icon: "🏨",
+      fields: ["hotel", "dateA"],
+    },
+    {
+      id: "two_hotels",
+      label: "Compare two hotels for a month",
+      icon: "⇄",
+      fields: ["hotelA", "hotelB", "dateA"],
+    },
+    {
+      id: "two_periods",
+      label: "Compare two different time periods",
+      icon: "📅",
+      fields: ["hotelOrAll", "dateA", "dateB"],
+    },
+    {
+      id: "biggest_mover",
+      label: "What's our biggest mover this month?",
+      icon: "📈",
+      fields: ["dateA"],
+    },
+    {
+      id: "missing_data",
+      label: "Which hotels are missing data this month?",
+      icon: "⚠",
+      fields: ["dateA"],
+    },
+  ];
+
+  const startQuestion = (preset) => {
+    setActiveQuestion(preset);
+    setForm({ dateA: todayStr, dateB: todayStr, hotel: "", hotelA: "", hotelB: "", hotelOrAll: "all" });
+  };
+
+  const cancelQuestion = () => { setActiveQuestion(null); setForm({}); };
+
+  const dateToYM = (dateStr) => {
+    const [y, m] = dateStr.split("-");
+    return { year: Number(y), month: Number(m) };
+  };
+
+  const pushMessage = (msg) => setMessages(prev => [...prev, msg]);
+
+  const askPreset = async () => {
+    setLoading(true);
+    const p = activeQuestion;
+    const a = dateToYM(form.dateA);
+    const b = dateToYM(form.dateB);
+
+    // Build a human-readable version of the question for the chat log
+    let questionText = p.label;
+    const hotelName = id => hotels.find(h => String(h.id)===String(id))?.name || "this hotel";
+
+    try {
+      if (p.id === "hotel_month") {
+        questionText = `How did ${hotelName(form.hotel)} do in ${MONTHS[a.month]} ${a.year}?`;
+        const summary = await api(`/monthly-results/summary/${a.year}/${a.month}`);
+        const row = summary.rows.find(r => String(r.hotel_id) === String(form.hotel));
+        pushMessage({ role: "user", text: questionText });
+        if (!row) {
+          pushMessage({ role: "answer", text: `No entries found for ${hotelName(form.hotel)} in ${MONTHS[a.month]} ${a.year}.` });
+        } else {
+          pushMessage({
+            role: "answer",
+            text: `${hotelName(form.hotel)} made ${fmt(row.total_income)} in ${MONTHS[a.month]} ${a.year}, across ${row.days_entered} day(s) of entries.`,
+            detail: `Guest: ${fmt(row.guest_laundry_income)} · Staff: ${fmt(row.staff_laundry_income)} · Flat: ${fmt(row.flat_laundry_income)}`
+          });
+        }
+      }
+
+      else if (p.id === "two_hotels") {
+        questionText = `Compare ${hotelName(form.hotelA)} and ${hotelName(form.hotelB)} for ${MONTHS[a.month]} ${a.year}`;
+        const summary = await api(`/monthly-results/summary/${a.year}/${a.month}`);
+        const rowA = summary.rows.find(r => String(r.hotel_id) === String(form.hotelA));
+        const rowB = summary.rows.find(r => String(r.hotel_id) === String(form.hotelB));
+        pushMessage({ role: "user", text: questionText });
+        const totalA = rowA?.total_income || 0;
+        const totalB = rowB?.total_income || 0;
+        const diff = totalA - totalB;
+        const leader = diff === 0 ? null : (diff > 0 ? hotelName(form.hotelA) : hotelName(form.hotelB));
+        pushMessage({
+          role: "answer",
+          text: leader
+            ? `${leader} earned more — ${fmt(Math.abs(diff))} ahead in ${MONTHS[a.month]} ${a.year}.`
+            : `Both hotels earned exactly the same in ${MONTHS[a.month]} ${a.year}.`,
+          detail: `${hotelName(form.hotelA)}: ${fmt(totalA)} · ${hotelName(form.hotelB)}: ${fmt(totalB)}`
+        });
+      }
+
+      else if (p.id === "two_periods") {
+        const scopeLabel = form.hotelOrAll === "all" ? "all hotels" : hotelName(form.hotelOrAll);
+        questionText = `Compare ${scopeLabel} — ${MONTHS[a.month]} ${a.year} vs ${MONTHS[b.month]} ${b.year}`;
+        const params = new URLSearchParams({ year_a: a.year, month_a: a.month, year_b: b.year, month_b: b.month });
+        if (form.hotelOrAll !== "all") params.set("hotel_id", form.hotelOrAll);
+        const result = await api(`/compare?${params}`);
+        pushMessage({ role: "user", text: questionText });
+        const dir = result.change >= 0 ? "up" : "down";
+        pushMessage({
+          role: "answer",
+          text: `${scopeLabel === "all hotels" ? "Total revenue" : scopeLabel} went ${dir} ${fmt(Math.abs(result.change))} (${result.pct_change != null ? Math.abs(result.pct_change)+"%" : "—"}) from ${result.period_a.label} to ${result.period_b.label}.`,
+          detail: `${result.period_a.label}: ${fmt(result.grand_total_a)} · ${result.period_b.label}: ${fmt(result.grand_total_b)}`
+        });
+      }
+
+      else if (p.id === "biggest_mover") {
+        questionText = `What's our biggest mover in ${MONTHS[a.month]} ${a.year}?`;
+        const ranking = await api(`/analytics/ranking/${a.year}/${a.month}`);
+        pushMessage({ role: "user", text: questionText });
+        const withGrowth = ranking.rankings.filter(r => r.revenue_growth_pct != null);
+        if (withGrowth.length === 0) {
+          pushMessage({ role: "answer", text: `Not enough history yet to calculate growth for ${MONTHS[a.month]} ${a.year}.` });
+        } else {
+          const up = withGrowth.reduce((best,r) => r.revenue_growth_pct > (best?.revenue_growth_pct ?? -Infinity) ? r : best, null);
+          const down = withGrowth.reduce((worst,r) => r.revenue_growth_pct < (worst?.revenue_growth_pct ?? Infinity) ? r : worst, null);
+          pushMessage({
+            role: "answer",
+            text: `${up.hotel_name} grew the most (+${up.revenue_growth_pct}%). ${down.hotel_name} dropped the most (${down.revenue_growth_pct}%).`,
+            detail: `Compared to the previous month.`
+          });
+        }
+      }
+
+      else if (p.id === "missing_data") {
+        questionText = `Which hotels are missing data in ${MONTHS[a.month]} ${a.year}?`;
+        const checks = await api(`/analytics/checks/${a.year}/${a.month}`);
+        pushMessage({ role: "user", text: questionText });
+        if (checks.missing_hotels.length === 0) {
+          pushMessage({ role: "answer", text: `Every active hotel has at least one entry for ${MONTHS[a.month]} ${a.year}.` });
+        } else {
+          pushMessage({
+            role: "answer",
+            text: `${checks.missing_hotels.length} hotel(s) have no entries yet for ${MONTHS[a.month]} ${a.year}:`,
+            detail: checks.missing_hotels.join(", ")
+          });
+        }
+      }
+    } catch (e) {
+      pushMessage({ role: "answer", text: `Couldn't get an answer: ${e.message}` });
+    }
+
+    setLoading(false);
+    setActiveQuestion(null);
+    setForm({});
+  };
+
+  const isFormReady = () => {
+    if (!activeQuestion) return false;
+    return activeQuestion.fields.every(f => {
+      if (f === "hotel" || f==="hotelA" || f==="hotelB") return !!form[f];
+      return true; // dates and hotelOrAll always have defaults
+    });
+  };
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div className="page-title">Insights</div>
+        <div className="page-sub">Tap a question to get an instant answer from your data</div>
+      </div>
+
+      {/* Chat log */}
+      <div className="card section-gap" style={{ minHeight: 200 }}>
+        <div className="card-body" style={{ display:"flex", flexDirection:"column", gap:14 }}>
+          {messages.map((m, i) => {
+            if (m.role === "system") return (
+              <div key={i} className="text-soft" style={{ fontSize:13, textAlign:"center" }}>{m.text}</div>
+            );
+            if (m.role === "user") return (
+              <div key={i} style={{ alignSelf:"flex-end", maxWidth:"75%" }}>
+                <div style={{ background:"var(--navy)", color:"#fff", borderRadius:"10px 10px 2px 10px", padding:"10px 14px", fontSize:13.5 }}>
+                  {m.text}
+                </div>
+              </div>
+            );
+            return (
+              <div key={i} style={{ alignSelf:"flex-start", maxWidth:"80%" }}>
+                <div style={{ background:"var(--sky)", color:"var(--ink)", borderRadius:"10px 10px 10px 2px", padding:"10px 14px", fontSize:13.5 }}>
+                  {m.text}
+                  {m.detail && <div className="text-soft" style={{ fontSize:12, marginTop:6 }}>{m.detail}</div>}
+                </div>
+              </div>
+            );
+          })}
+          {loading && <div className="text-soft" style={{ fontSize:13 }}>Thinking…</div>}
+        </div>
+      </div>
+
+      {/* Preset question buttons */}
+      {!activeQuestion && (
+        <div className="card">
+          <div className="card-header"><span className="card-title">Questions</span></div>
+          <div className="card-body" style={{ display:"grid", gap:10, gridTemplateColumns:"repeat(auto-fill, minmax(260px,1fr))" }}>
+            {PRESETS.map(p => (
+              <button key={p.id} className="btn btn-secondary" style={{ justifyContent:"flex-start", padding:"14px 16px", fontSize:13.5, height:"auto", whiteSpace:"normal", textAlign:"left" }}
+                onClick={() => startQuestion(p)}>
+                <span style={{ marginRight:8 }}>{p.icon}</span>{p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Inline form for the selected question */}
+      {activeQuestion && (
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">{activeQuestion.icon} {activeQuestion.label}</span>
+            <button className="modal-close" onClick={cancelQuestion}>×</button>
+          </div>
+          <div className="card-body">
+            <div className="form-grid form-grid-2">
+              {activeQuestion.fields.includes("hotel") && (
+                <div className="form-row">
+                  <label className="form-label">Hotel</label>
+                  <select className="input" value={form.hotel} onChange={e=>setForm({...form, hotel:e.target.value})}>
+                    <option value="">Select a hotel…</option>
+                    {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                  </select>
+                </div>
+              )}
+              {activeQuestion.fields.includes("hotelA") && (
+                <div className="form-row">
+                  <label className="form-label">First hotel</label>
+                  <select className="input" value={form.hotelA} onChange={e=>setForm({...form, hotelA:e.target.value})}>
+                    <option value="">Select a hotel…</option>
+                    {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                  </select>
+                </div>
+              )}
+              {activeQuestion.fields.includes("hotelB") && (
+                <div className="form-row">
+                  <label className="form-label">Second hotel</label>
+                  <select className="input" value={form.hotelB} onChange={e=>setForm({...form, hotelB:e.target.value})}>
+                    <option value="">Select a hotel…</option>
+                    {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                  </select>
+                </div>
+              )}
+              {activeQuestion.fields.includes("hotelOrAll") && (
+                <div className="form-row">
+                  <label className="form-label">Hotel</label>
+                  <select className="input" value={form.hotelOrAll} onChange={e=>setForm({...form, hotelOrAll:e.target.value})}>
+                    <option value="all">All hotels combined</option>
+                    {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                  </select>
+                </div>
+              )}
+              {activeQuestion.fields.includes("dateA") && (
+                <div className="form-row">
+                  <label className="form-label">{activeQuestion.fields.includes("dateB") ? "First date" : "Date"}</label>
+                  <input type="date" className="input" value={form.dateA} onChange={e=>setForm({...form, dateA:e.target.value})} />
+                </div>
+              )}
+              {activeQuestion.fields.includes("dateB") && (
+                <div className="form-row">
+                  <label className="form-label">Second date</label>
+                  <input type="date" className="input" value={form.dateB} onChange={e=>setForm({...form, dateB:e.target.value})} />
+                </div>
+              )}
+            </div>
+            <div className="flex gap-8 mt-16">
+              <button className="btn btn-secondary" onClick={cancelQuestion}>Cancel</button>
+              <button className="btn btn-primary" onClick={askPreset} disabled={!isFormReady() || loading}>
+                {loading ? "Asking…" : "Get answer"}
+              </button>
+            </div>
+            <p className="text-soft" style={{ fontSize:12, marginTop:10 }}>
+              Pick any date — we'll use whichever month it falls in.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RANKING PAGE
+// ─────────────────────────────────────────────────────────────────────────────
+function RankingPage({ year, month }) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    api(`/analytics/ranking/${year}/${month}`).then(setData);
+  }, [year, month]);
+
+  if (!data) return <div className="page"><div className="spinner"></div></div>;
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div className="page-title">Hotel Performance</div>
+        <div className="page-sub">{MONTHS[month]} {year} — ranked by revenue</div>
+      </div>
+
+      <div className="card">
+        <div className="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Hotel</th>
+                <th style={{textAlign:"right"}}>Revenue</th>
+                <th style={{textAlign:"right"}}>Prev Month</th>
+                <th style={{textAlign:"right"}}>Growth</th>
+                <th style={{textAlign:"right"}}>Pool Stock</th>
+                <th style={{textAlign:"right"}}>Share of Total</th>
+                <th>Performance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rankings.map(r=>(
+                <tr key={r.hotel_id}>
+                  <td className="mono text-soft">{r.rank}</td>
+                  <td style={{fontWeight:600}}>{r.hotel_name}</td>
+                  <td className="num total">{fmt(r.total_revenue)}</td>
+                  <td className="num text-soft">{fmt(r.previous_revenue)}</td>
+                  <td className="num">{fmtPct(r.revenue_growth_pct)}</td>
+                  <td className="num mono">{r.pool_stock_volume?.toLocaleString()||"—"}</td>
+                  <td className="num text-soft">{r.contribution_pct}%</td>
+                  <td><LabelBadge label={r.label} /></td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="tfoot-row">
+                <td colSpan={2}>TOTAL</td>
+                <td className="num">{fmt(data.grand_total)}</td>
+                <td colSpan={5}></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPORTS PAGE
+// ─────────────────────────────────────────────────────────────────────────────
+function ExportsPage({ year, month }) {
+  const dl = path => { window.open(`${API}${path}?year=${year}&month=${month}`, "_blank"); };
+
+  const [backupHistory, setBackupHistory] = useState(null);
+  const [backingUp, setBackingUp] = useState(false);
+  const [backupMessage, setBackupMessage] = useState(null);
+
+  const loadBackupHistory = () => api("/backup/history").then(setBackupHistory);
+  useEffect(() => { loadBackupHistory(); }, []);
+
+  const runBackup = async () => {
+    setBackingUp(true);
+    setBackupMessage(null);
+    try {
+      const result = await api("/backup/run", { method: "POST" });
+      setBackupMessage({ type: "ok", text: `Backup saved successfully (${result.filename}).` });
+      loadBackupHistory();
+    } catch (e) {
+      setBackupMessage({ type: "error", text: `Backup failed: ${e.message}` });
+    }
+    setBackingUp(false);
+  };
+
+  const formatLastBackup = (iso) => {
+    if (!iso) return "No backups yet";
+    const d = new Date(iso);
+    return d.toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div className="page-title">Export</div>
+        <div className="page-sub">Download Excel files for {MONTHS[month]} {year}</div>
+      </div>
+
+      <div style={{ display:"grid", gap:16, maxWidth:600 }}>
+        {[
+          { title:"Monthly Results", desc:"All hotel income figures, totals, and statuses", path:"/exports/monthly-results", icon:"📊" },
+          { title:"Pool Stock Summary", desc:"All linen entries with a summary sheet by hotel and item", path:"/exports/pool-stock", icon:"🛏️" },
+          { title:"Hotel Performance Ranking", desc:"Revenue ranking with growth and contribution percentages", path:"/exports/ranking", icon:"🏆" },
+        ].map(ex=>(
+          <div className="card" key={ex.title}>
+            <div className="card-body" style={{ display:"flex", alignItems:"center", gap:20 }}>
+              <div style={{ fontSize:36 }}>{ex.icon}</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:700, fontSize:15, marginBottom:3 }}>{ex.title}</div>
+                <div className="text-soft" style={{ fontSize:13 }}>{ex.desc}</div>
+              </div>
+              <button className="btn btn-primary" onClick={()=>dl(ex.path)}>
+                ↓ Download
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="page-header" style={{ marginTop:32 }}>
+        <div className="page-title" style={{ fontSize:18 }}>Backup</div>
+        <div className="page-sub">Keep a safety copy of all your data, separate from this computer</div>
+      </div>
+
+      <div className="card" style={{ maxWidth:600 }}>
+        <div className="card-body">
+          <div className="flex-between" style={{ alignItems:"flex-start" }}>
+            <div>
+              <div style={{ fontWeight:600, fontSize:14, marginBottom:4 }}>
+                Last backup: {backupHistory ? formatLastBackup(backupHistory.last_backup_at) : "Loading…"}
+              </div>
+              <div className="text-soft" style={{ fontSize:12 }}>
+                {backupHistory ? `${backupHistory.total_count} backup(s) kept` : ""}
+              </div>
+            </div>
+            <button className="btn btn-primary" onClick={runBackup} disabled={backingUp}>
+              {backingUp ? "Backing up…" : "🔒 Back up now"}
+            </button>
+          </div>
+
+          {backupMessage && (
+            <div className={`alert ${backupMessage.type === "ok" ? "alert-ok" : "alert-error"}`} style={{ marginTop:14 }}>
+              {backupMessage.text}
+            </div>
+          )}
+
+          <p className="text-soft" style={{ fontSize:12, marginTop:14, lineHeight:1.6 }}>
+            This saves a complete copy of all hotels, daily entries, and pool stock to a backup folder.
+            It's a good habit to do this at the end of each working day — especially before this computer
+            is restarted or updated.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHECKS PAGE
+// ─────────────────────────────────────────────────────────────────────────────
+function ChecksPage({ year, month }) {
+  const [data, setData] = useState(null);
+  useEffect(() => { api(`/analytics/checks/${year}/${month}`).then(setData); }, [year, month]);
+  if (!data) return <div className="page"><div className="spinner"></div></div>;
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div className="page-title">Data Checks</div>
+        <div className="page-sub">{MONTHS[month]} {year} — {data.issue_count === 0 ? "All clear" : `${data.issue_count} issue(s) found`}</div>
+      </div>
+
+      {data.issue_count === 0 ? (
+        <div className="alert alert-ok"><span>✓</span> No issues found for {MONTHS[month]} {year}. All data looks complete.</div>
+      ) : (
+        data.issues.map((iss, i) => (
+          <div key={i} className="alert alert-warn section-gap">
+            <span>⚠</span>
+            <div>
+              <strong>{iss.type.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase())}</strong>
+              <div style={{marginTop:3}}>{iss.detail}</div>
+            </div>
+          </div>
+        ))
+      )}
+
+      <div className="grid-2" style={{ marginTop:24 }}>
+        <div className="card">
+          <div className="card-header"><span className="card-title">Missing Monthly Data</span></div>
+          <div className="card-body">
+            {data.missing_hotels.length === 0
+              ? <span className="text-soft">All active hotels have data.</span>
+              : data.missing_hotels.map(n=><div key={n} style={{padding:"6px 0", borderBottom:"1px solid var(--rule)", color:"var(--amber)", fontWeight:600}}>⚠ {n}</div>)
+            }
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-header"><span className="card-title">Zero Totals</span></div>
+          <div className="card-body">
+            {data.blank_total_hotels.length === 0
+              ? <span className="text-soft">No zero totals found.</span>
+              : data.blank_total_hotels.map(n=><div key={n} style={{padding:"6px 0", borderBottom:"1px solid var(--rule)", color:"var(--amber)", fontWeight:600}}>⚠ {n}</div>)
+            }
+          </div>
+        </div>
+        {Object.keys(data.duplicate_packing_refs).length > 0 && (
+          <div className="card">
+            <div className="card-header"><span className="card-title">Duplicate Packing List Refs</span></div>
+            <div className="card-body">
+              {Object.entries(data.duplicate_packing_refs).map(([ref,ids])=>(
+                <div key={ref} style={{padding:"6px 0",borderBottom:"1px solid var(--rule)",color:"var(--red)",fontSize:13}}>
+                  <span className="mono">{ref}</span> — appears {ids.length}×
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// APP ROOT
+// ─────────────────────────────────────────────────────────────────────────────
+const NAV = [
+  { key:"dashboard",  label:"Dashboard",        icon:"◈" },
+  { key:"results",    label:"Monthly Results",   icon:"↕" },
+  { key:"poolstock",  label:"Pool Stock",        icon:"🛏" },
+  { key:"comparison", label:"Insights",          icon:"💬" },
+  { key:"ranking",    label:"Performance",       icon:"★" },
+  { key:"checks",     label:"Data Checks",       icon:"✓" },
+  { key:"pettycash",  label:"Petty Cash",        icon:"💷" },
+  { key:"hotels",     label:"Hotels",            icon:"🏨" },
+  { key:"exports",    label:"Export",            icon:"↓" },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PETTY CASH PAGE
+// ─────────────────────────────────────────────────────────────────────────────
+const PC_CATEGORIES = [
+  "Canteen Food","Staff Canteen","Staff Benefit","Staff Uniform",
+  "Postage","Purchases","Motor Expense","Travel","Misc",
+  "P&S","Cleaning","Carpet Cleaner","French Polisher",
+  "Waste Removal","Paint Supplies","Advance","Compensation",
+  "Carpet Cleaners Parking/Electric","Other",
+];
+
+function PettyCashPage({ year, month, toast }) {
+  const [vouchers, setVouchers]   = useState([]);
+  const [breakdown, setBreakdown] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing]     = useState(null);
+  const [printAll, setPrintAll]   = useState(false);
+  const [printOne, setPrintOne]   = useState(null);
+  const [activeTab, setActiveTab] = useState("vouchers");
+
+  const emptyForm = () => ({
+    voucher_date: `${year}-${String(month).padStart(2,"0")}-01`,
+    required_for: "", category: "Misc", customCategory: "", passed_by: "", notes: "",
+    items: [{ description:"", amount_gbp:"", gross:"", vat:"" }],
+  });
+  const [form, setForm] = useState(emptyForm);
+
+  const load = useCallback(() => {
+    Promise.all([
+      api(`/petty-cash/vouchers?year=${year}&month=${month}`),
+      api(`/petty-cash/breakdown/${year}/${month}`),
+    ]).then(([v, b]) => { setVouchers(v); setBreakdown(b); });
+  }, [year, month]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openNew = () => { setEditing(null); setForm(emptyForm()); setShowModal(true); };
+  const openEdit = (v) => {
+    setEditing(v);
+    const isKnownCategory = PC_CATEGORIES.includes(v.category);
+    setForm({
+      voucher_date: v.voucher_date,
+      required_for: v.required_for,
+      category: isKnownCategory ? v.category : "Other",
+      customCategory: isKnownCategory ? "" : v.category,
+      passed_by: v.passed_by || "",
+      notes: v.notes || "",
+      items: (v.items||[]).length > 0
+        ? v.items.map(i => ({ description: i.description, amount_gbp: String(i.amount_gbp), gross: String(i.gross||""), vat: String(i.vat||"") }))
+        : [{ description:"", amount_gbp:"", gross:"", vat:"" }],
+    });
+    setShowModal(true);
+  };
+
+  const addItem = () => setForm(f => ({ ...f, items: [...f.items, { description:"", amount_gbp:"", gross:"", vat:"" }] }));
+  const removeItem = idx => setForm(f => ({ ...f, items: f.items.filter((_,i) => i!==idx) }));
+  const setItem = (idx, field, value) => setForm(f => {
+    const items = [...f.items]; items[idx] = { ...items[idx], [field]: value }; return { ...f, items };
+  });
+
+  const voucherTotal = form.items.reduce((s, i) => s + (parseFloat(i.amount_gbp)||0), 0);
+
+  const saveVoucher = async () => {
+    if (!form.required_for.trim()) { toast("Required For is needed.", "error"); return; }
+    if (form.category === "Other" && !form.customCategory?.trim()) { toast("Please describe the category.", "error"); return; }
+    const items = form.items.filter(i => i.description || i.amount_gbp);
+    try {
+      const finalCategory = form.category === "Other" ? (form.customCategory.trim() || "Other") : form.category;
+      const body = { ...form, category: finalCategory, items: items.map(i => ({
+        description: i.description,
+        amount_gbp:  parseFloat(i.amount_gbp) || 0,
+        gross:       parseFloat(i.gross) || parseFloat(i.amount_gbp) || 0,
+        vat:         parseFloat(i.vat) || 0,
+      }))};
+      if (editing) {
+        await api(`/petty-cash/vouchers/${editing.id}`, { method:"PATCH", body });
+        toast("Voucher updated.", "ok");
+      } else {
+        await api("/petty-cash/vouchers", { method:"POST", body });
+        toast("Voucher saved.", "ok");
+      }
+      setShowModal(false); setEditing(null); setForm(emptyForm()); load();
+    } catch(e) { toast(e.message, "error"); }
+  };
+
+  const deleteVoucher = async (id) => {
+    if (!confirm("Delete this voucher?")) return;
+    await api(`/petty-cash/vouchers/${id}`, { method:"DELETE" });
+    toast("Deleted.", "ok"); load();
+  };
+
+  const dlExport = () => window.open(`${API}/petty-cash/export/${year}/${month}`, "_blank");
+
+  // ── Compact voucher card for batch print ──
+  const VoucherCard = ({ v }) => {
+    const items = v.items||[];
+    const blankRows = Math.max(2, 5 - items.length);
+    const rows = [...items, ...Array(blankRows).fill({ description:"", amount_gbp:"" })];
+    return (
+      <div style={{
+        border:"1px solid #000", padding:"5px 7px",
+        fontFamily:"Arial, sans-serif", fontSize:8.5,
+        boxSizing:"border-box", background:"#fff",
+        breakInside:"avoid", pageBreakInside:"avoid",
+      }}>
+        <div style={{textAlign:"center", fontWeight:700, fontSize:9.5, letterSpacing:1, marginBottom:3}}>
+          PETTY CASH VOUCHER
+        </div>
+        <div style={{display:"flex", justifyContent:"space-between", fontSize:8, marginBottom:2}}>
+          <span><strong>Date:</strong> {v.voucher_date}</span>
+          <span><strong>Category:</strong> {v.category}</span>
+        </div>
+        <div style={{marginBottom:2, fontSize:8}}><strong>Required For:</strong> {v.required_for}</div>
+        <table style={{width:"100%", borderCollapse:"collapse", fontSize:8, marginBottom:3}}>
+          <thead>
+            <tr>
+              <th style={{border:"1px solid #000", padding:"1px 3px", textAlign:"left", background:"#e8edf5"}}>Description</th>
+              <th style={{border:"1px solid #000", padding:"1px 3px", textAlign:"right", width:26, background:"#e8edf5"}}>£</th>
+              <th style={{border:"1px solid #000", padding:"1px 3px", textAlign:"right", width:22, background:"#e8edf5"}}>P</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((item, i) => {
+              const amt = parseFloat(item.amount_gbp)||0;
+              return (
+                <tr key={i}>
+                  <td style={{border:"1px solid #000", padding:"1px 3px", height:13}}>{item.description||""}</td>
+                  <td style={{border:"1px solid #000", padding:"1px 3px", textAlign:"right"}}>{amt>0?Math.floor(amt):""}</td>
+                  <td style={{border:"1px solid #000", padding:"1px 3px", textAlign:"right"}}>{amt>0?String(Math.round((amt-Math.floor(amt))*100)).padStart(2,"0"):""}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td style={{border:"1px solid #000", padding:"1px 3px", fontWeight:700, background:"#f5f5f5"}}>TOTAL</td>
+              <td style={{border:"1px solid #000", padding:"1px 3px", textAlign:"right", fontWeight:700, background:"#f5f5f5"}}>{Math.floor(v.total_amount)}</td>
+              <td style={{border:"1px solid #000", padding:"1px 3px", textAlign:"right", fontWeight:700, background:"#f5f5f5"}}>{String(Math.round((v.total_amount-Math.floor(v.total_amount))*100)).padStart(2,"0")}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:6}}>
+          <div>
+            <div style={{borderBottom:"1px solid #000", height:14}}></div>
+            <div style={{fontSize:7, marginTop:1}}>SIGNATURE</div>
+          </div>
+          <div>
+            <div style={{borderBottom:"1px solid #000", height:14, fontSize:8}}>{v.passed_by||""}</div>
+            <div style={{fontSize:7, marginTop:1}}>PASSED BY</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (printAll) return (
+    <div>
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          @page { size: A4 portrait; margin: 6mm; }
+          .voucher-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-auto-rows: auto;
+            gap: 3mm;
+            width: 198mm;
+          }
+          .page-break { page-break-after: always; margin-bottom: 0 !important; }
+          body { margin: 0; }
+        }
+        .voucher-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 6px;
+          max-width: 800px;
+        }
+      `}</style>
+      <div className="no-print" style={{padding:"12px 24px",background:"var(--navy)",display:"flex",alignItems:"center",gap:12}}>
+        <span style={{color:"#fff",fontWeight:600}}>🖨 Print Preview — {vouchers.length} voucher(s) · {MONTHS[month]} {year} · 6 per page</span>
+        <button className="btn btn-primary" onClick={()=>window.print()}>Print</button>
+        <button className="btn btn-secondary" onClick={()=>setPrintAll(false)}>← Back</button>
+      </div>
+      <div style={{padding:12}}>
+        {Array.from({length:Math.ceil(vouchers.length/6)},(_,pageIdx)=>(
+          <div key={pageIdx}
+            className={pageIdx<Math.ceil(vouchers.length/6)-1?"voucher-grid page-break":"voucher-grid"}
+            style={{marginBottom:12}}>
+            {vouchers.slice(pageIdx*6,pageIdx*6+6).map(v=>(
+              <VoucherCard key={v.id} v={v} />
+            ))}
+            {pageIdx===Math.ceil(vouchers.length/6)-1 && vouchers.length%6!==0 &&
+              Array.from({length:6-(vouchers.length%6)},(_,i)=>(
+                <div key={"e"+i} style={{border:"1px dashed #ccc",opacity:0.2,minHeight:60}} />
+              ))
+            }
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+
+  return (
+    <div className="page">
+      <div className="flex-between page-header">
+        <div>
+          <div className="page-title">Petty Cash</div>
+          <div className="page-sub">{MONTHS[month]} {year} — {vouchers.length} voucher(s) · Total: {fmt(breakdown?.grand_total||0)}</div>
+        </div>
+        <div className="flex gap-8">
+          <button className="btn btn-secondary" onClick={dlExport}>↓ Export Excel</button>
+          {vouchers.length > 0 && (
+            <button className="btn btn-secondary" onClick={()=>setPrintAll(true)}>🖨 Print all ({vouchers.length})</button>
+          )}
+          <button className="btn btn-primary" onClick={openNew}>+ New Voucher</button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="card section-gap" style={{padding:"10px 14px"}}>
+        <div className="flex gap-8">
+          {[["vouchers","📋 Vouchers"],["breakdown","📊 Breakdown"]].map(([k,l])=>(
+            <button key={k} className="btn btn-sm"
+              style={{background:activeTab===k?"var(--navy)":"var(--sky)",color:activeTab===k?"#fff":"var(--navy)",border:"none"}}
+              onClick={()=>setActiveTab(k)}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Vouchers list */}
+      {activeTab === "vouchers" && (
+        <div className="card">
+          <div className="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Required For</th>
+                  <th>Category</th>
+                  <th>Passed By</th>
+                  <th>Items</th>
+                  <th style={{textAlign:"right"}}>Total</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {vouchers.length === 0 && (
+                  <tr><td colSpan={7}>
+                    <div className="empty-state">
+                      <div className="empty-icon">💷</div>
+                      <div className="empty-title">No vouchers yet</div>
+                      <div>Click "+ New Voucher" to add the first one.</div>
+                    </div>
+                  </td></tr>
+                )}
+                {vouchers.map(v => (
+                  <tr key={v.id}>
+                    <td className="mono" style={{fontSize:12}}>{v.voucher_date}</td>
+                    <td style={{fontWeight:600}}>{v.required_for}</td>
+                    <td><span className="badge badge-navy">{v.category}</span></td>
+                    <td className="text-soft">{v.passed_by||"—"}</td>
+                    <td>
+                      <div style={{display:"flex",flexDirection:"column",gap:1}}>
+                        {(v.items||[]).map((item,i)=>(
+                          <div key={i} style={{fontSize:11,color:"var(--ink-soft)"}}>
+                            {item.description||"—"} <span className="mono" style={{color:"var(--navy)"}}>{fmt(item.amount_gbp)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="num total">{fmt(v.total_amount)}</td>
+                    <td>
+                      <div className="flex gap-8">
+                        <button className="btn btn-secondary btn-xs" onClick={()=>openEdit(v)}>Edit</button>
+                        <button className="btn btn-danger btn-xs" onClick={()=>deleteVoucher(v.id)}>Del</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Breakdown — horizontal table matching Excel layout */}
+      {activeTab === "breakdown" && breakdown && (
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Petty Cash Breakdown — {MONTHS[month]} {year}</span>
+            <span className="text-soft" style={{fontSize:12}}>Grand Total: <strong>{fmt(breakdown.grand_total)}</strong></span>
+          </div>
+          <div className="tbl-wrap">
+            <table style={{fontSize:11, minWidth:1200}}>
+              <thead>
+                <tr>
+                  <th style={{minWidth:160, textAlign:"left"}}>Description</th>
+                  <th style={{minWidth:70,textAlign:"right"}}>Gross £</th>
+                  {PC_CATEGORIES.map(cat => (
+                    <th key={cat} style={{minWidth:70,textAlign:"right",fontSize:10,whiteSpace:"normal",lineHeight:1.2}}>{cat}</th>
+                  ))}
+                </tr>
+                <tr>
+                  <td style={{fontSize:9,color:"var(--ink-soft)",padding:"2px 14px"}}></td>
+                  <td></td>
+                  {PC_CATEGORIES.map(cat => (
+                    <td key={cat} style={{fontSize:9,color:"var(--ink-soft)",textAlign:"right",padding:"2px 8px",fontFamily:"var(--font-mono)"}}>
+                      {breakdown.account_codes?.[cat]||""}
+                    </td>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {breakdown.vouchers?.map(v => (
+                  v.items && v.items.length > 0
+                    ? v.items.map((item, i) => (
+                      <tr key={`${v.id}-${i}`}>
+                        <td style={{fontSize:12}}>{item.description||v.required_for}</td>
+                        <td className="num mono" style={{fontSize:11}}>{item.gross||item.amount_gbp ? fmt(item.gross||item.amount_gbp) : "—"}</td>
+                        {PC_CATEGORIES.map(cat => (
+                          <td key={cat} className="num mono" style={{fontSize:11}}>
+                            {v.category === cat ? fmt(item.amount_gbp) : ""}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                    : (
+                      <tr key={v.id}>
+                        <td style={{fontSize:12}}>{v.required_for}</td>
+                        <td className="num mono" style={{fontSize:11}}>{fmt(v.total_amount)}</td>
+                        {PC_CATEGORIES.map(cat => (
+                          <td key={cat} className="num mono" style={{fontSize:11}}>
+                            {v.category === cat ? fmt(v.total_amount) : ""}
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="tfoot-row">
+                  <td><strong>TOTAL</strong></td>
+                  <td className="num">{fmt(breakdown.grand_total)}</td>
+                  {PC_CATEGORIES.map(cat => (
+                    <td key={cat} className="num">
+                      {breakdown.category_totals?.[cat] > 0 ? fmt(breakdown.category_totals[cat]) : "—"}
+                    </td>
+                  ))}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* New/Edit voucher modal */}
+      {showModal && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShowModal(false)}>
+          <div className="modal" style={{width:660,maxHeight:"92vh",overflowY:"auto"}}>
+            <div className="modal-header">
+              <span className="modal-title">{editing ? "Edit Voucher" : "New Petty Cash Voucher"}</span>
+              <button className="modal-close" onClick={()=>setShowModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-grid form-grid-2">
+                <div className="form-row">
+                  <label className="form-label">Date <span style={{color:"var(--red)"}}>*</span></label>
+                  <input type="date" className="input" value={form.voucher_date}
+                    onChange={e=>setForm({...form,voucher_date:e.target.value})} />
+                </div>
+                <div className="form-row">
+                  <label className="form-label">Required For <span style={{color:"var(--red)"}}>*</span></label>
+                  <input className="input" value={form.required_for}
+                    onChange={e=>setForm({...form,required_for:e.target.value})}
+                    placeholder="e.g. Chef, Camper" />
+                </div>
+                <div className="form-row">
+                  <label className="form-label">Category <span style={{color:"var(--red)"}}>*</span></label>
+                  <select className="input" value={form.category}
+                    onChange={e=>setForm({...form, category:e.target.value, customCategory:""})}>
+                    {PC_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+                  </select>
+                  {form.category === "Other" && (
+                    <input className="input" style={{marginTop:6}}
+                      value={form.customCategory||""}
+                      onChange={e=>setForm({...form, customCategory:e.target.value})}
+                      placeholder="Describe the category…" />
+                  )}
+                </div>
+                <div className="form-row">
+                  <label className="form-label">Passed By <span className="text-soft">(optional)</span></label>
+                  <input className="input" value={form.passed_by}
+                    onChange={e=>setForm({...form,passed_by:e.target.value})}
+                    placeholder="e.g. Manager Name" />
+                </div>
+              </div>
+
+              <div style={{marginTop:20}}>
+                <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>
+                  Items — what was purchased
+                  <span className="text-soft" style={{fontWeight:400,fontSize:12,marginLeft:8}}>all fields optional except Amount</span>
+                </div>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                  <thead>
+                    <tr>
+                      <th style={{textAlign:"left",padding:"6px 8px",background:"var(--sky)",fontSize:11}}>Description <span className="text-soft">(opt)</span></th>
+                      <th style={{textAlign:"right",padding:"6px 8px",background:"var(--sky)",fontSize:11,width:110}}>Amount £ *</th>
+                      <th style={{textAlign:"right",padding:"6px 8px",background:"var(--sky)",fontSize:11,width:90}}>Gross £ <span className="text-soft">(opt)</span></th>
+                      <th style={{textAlign:"right",padding:"6px 8px",background:"var(--sky)",fontSize:11,width:80}}>VAT £ <span className="text-soft">(opt)</span></th>
+                      <th style={{width:32}}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {form.items.map((item,idx)=>(
+                      <tr key={idx} style={{borderBottom:"1px solid var(--rule)"}}>
+                        <td style={{padding:"5px 6px"}}>
+                          <input className="input input-sm" style={{width:"100%"}}
+                            value={item.description} placeholder="e.g. Milk, cleaning spray"
+                            onChange={e=>setItem(idx,"description",e.target.value)} />
+                        </td>
+                        <td style={{padding:"5px 6px"}}>
+                          <input type="number" step="0.01" min="0" className="input input-money input-sm"
+                            value={item.amount_gbp} placeholder="0.00"
+                            onChange={e=>setItem(idx,"amount_gbp",e.target.value)} />
+                        </td>
+                        <td style={{padding:"5px 6px"}}>
+                          <input type="number" step="0.01" min="0" className="input input-money input-sm"
+                            value={item.gross} placeholder="0.00"
+                            onChange={e=>setItem(idx,"gross",e.target.value)} />
+                        </td>
+                        <td style={{padding:"5px 6px"}}>
+                          <input type="number" step="0.01" min="0" className="input input-money input-sm"
+                            value={item.vat} placeholder="0.00"
+                            onChange={e=>setItem(idx,"vat",e.target.value)} />
+                        </td>
+                        <td style={{padding:"5px 6px"}}>
+                          {form.items.length > 1 && (
+                            <button className="btn btn-danger btn-xs" onClick={()=>removeItem(idx)}>✕</button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <button className="btn btn-secondary btn-sm" style={{marginTop:8}} onClick={addItem}>+ Add item</button>
+              </div>
+
+              <div style={{marginTop:16,padding:"12px 16px",background:"var(--sky)",borderRadius:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontWeight:600,fontSize:14}}>Voucher Total</span>
+                <span style={{fontWeight:700,fontSize:22,color:"var(--navy)",fontFamily:"var(--font-mono)"}}>{fmt(voucherTotal)}</span>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={()=>setShowModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={saveVoucher}>{editing ? "Save changes" : "Save voucher"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BackupReminder() {
+  const [show, setShow] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const todayKey = () => {
+    const d = new Date();
+    return `laundry_backup_reminder_${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+  };
+
+  useEffect(() => {
+    const checkTime = () => {
+      const now = new Date();
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+      // Window is 16:00-16:30 (4:00-4:30pm)
+      const inReminderWindow = hour === 16 && minute <= 30;
+      const alreadyHandledToday = window.sessionStorage.getItem(todayKey());
+      if (inReminderWindow && !alreadyHandledToday) {
+        setShow(true);
+      }
+    };
+    checkTime();
+    const interval = setInterval(checkTime, 60000); // check once a minute
+    return () => clearInterval(interval);
+  }, []);
+
+  const dismiss = () => {
+    window.sessionStorage.setItem(todayKey(), "dismissed");
+    setShow(false);
+  };
+
+  const backupNow = async () => {
+    setBackingUp(true);
+    try {
+      await api("/backup/run", { method: "POST" });
+      window.sessionStorage.setItem(todayKey(), "backed_up");
+      setDone(true);
+      setTimeout(() => setShow(false), 1800);
+    } catch (e) {
+      setBackingUp(false);
+    }
+  };
+
+  if (!show) return null;
+
+  return (
+    <div className="overlay" style={{ zIndex: 200 }}>
+      <div className="modal" style={{ width: 380 }}>
+        <div className="modal-header">
+          <span className="modal-title">🔒 End-of-day backup</span>
+          <button className="modal-close" onClick={dismiss}>×</button>
+        </div>
+        <div className="modal-body">
+          {done ? (
+            <div className="alert alert-ok">✓ Backed up successfully. Have a good evening!</div>
+          ) : (
+            <p style={{ fontSize:13.5, lineHeight:1.6 }}>
+              It's around end-of-day. Want to save a backup copy of today's work before you finish up?
+            </p>
+          )}
+        </div>
+        {!done && (
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={dismiss}>Not now</button>
+            <button className="btn btn-primary" onClick={backupNow} disabled={backingUp}>
+              {backingUp ? "Backing up…" : "Back up now"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DemoBanner({ toast }) {
+  const [info, setInfo] = useState(null);
+  const [resetting, setResetting] = useState(false);
+
+  useEffect(() => {
+    fetch(API + "/api/demo-info").then(r => r.json()).then(setInfo).catch(() => {});
+  }, []);
+
+  if (!info || !info.demo_mode) return null;
+
+  const handleReset = async () => {
+    setResetting(true);
+    try {
+      const res = await fetch(API + "/api/demo-reset", { method: "POST" });
+      if (!res.ok) throw new Error();
+      toast && toast("Demo data reset.", "ok");
+      setTimeout(() => window.location.reload(), 600);
+    } catch {
+      toast && toast("Reset failed.", "error");
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  return (
+    <div className="demo-banner">
+      <strong>Demo mode</strong> &mdash; sample/anonymised data only.
+      No real company, customer, employee, or financial data.
+      <button onClick={handleReset} disabled={resetting}>
+        {resetting ? "Resetting…" : "Reset demo data"}
+      </button>
+    </div>
+  );
+}
+
+function App() {
+  const [page, setPage] = useState("dashboard");
+  const now = new Date();
+  const [year, setYear]   = useState(2025);   // use sample data year
+  const [month, setMonth] = useState(3);
+  const [toastMsg, setToast] = useState(null);
+
+  const toast = (msg, type="ok") => setToast({ msg, type });
+
+  const years = [2024, 2025, 2026];
+
+  const pageProps = { year, month, toast };
+
+  return (
+    <div id="root">
+      <nav className="sidebar">
+        <div className="sidebar-brand">
+          <div className="brand-crown">👑</div>
+          <div className="brand-name">Laundry Manager</div>
+          <div className="brand-sub">Manager Dashboard</div>
+        </div>
+        <div className="sidebar-nav">
+          <div className="nav-group-label"><span>Reports</span></div>
+          {NAV.slice(0,6).map(n=>(
+            <button key={n.key} className={`nav-item ${page===n.key?"active":""}`} onClick={()=>setPage(n.key)}>
+              <span className="icon">{n.icon}</span>
+              <span>{n.label}</span>
+            </button>
+          ))}
+          <div className="nav-group-label" style={{marginTop:8}}><span>Admin</span></div>
+          {NAV.slice(6).map(n=>(
+            <button key={n.key} className={`nav-item ${page===n.key?"active":""}`} onClick={()=>setPage(n.key)}>
+              <span className="icon">{n.icon}</span>
+              <span>{n.label}</span>
+            </button>
+          ))}
+        </div>
+        <DemoBanner toast={toast} />
+      </nav>
+
+      <div className="main">
+        <div className="topbar">
+          <span className="topbar-title">{NAV.find(n=>n.key===page)?.label}</span>
+          <div className="topbar-right">
+            <div className="month-picker">
+              <select value={month} onChange={e=>setMonth(Number(e.target.value))}>
+                {MONTHS.slice(1).map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
+              </select>
+              <select value={year} onChange={e=>setYear(Number(e.target.value))}>
+                {years.map(y=><option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {page==="dashboard"  && <Dashboard   {...pageProps} setPage={setPage} />}
+        {page==="results"    && <MonthlyResultsPage {...pageProps} />}
+        {page==="poolstock"  && <PoolStockPage {...pageProps} />}
+        {page==="comparison" && <ComparisonPage {...pageProps} />}
+        {page==="ranking"    && <RankingPage {...pageProps} />}
+        {page==="checks"     && <ChecksPage {...pageProps} />}
+        {page==="pettycash"  && <PettyCashPage {...pageProps} />}
+        {page==="hotels"     && <HotelsPage {...pageProps} />}
+        {page==="exports"    && <ExportsPage {...pageProps} />}
+      </div>
+
+      {toastMsg && <Toast msg={toastMsg.msg} type={toastMsg.type} onClose={()=>setToast(null)} />}
+      <BackupReminder />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

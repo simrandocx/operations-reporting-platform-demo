@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: operations-reporting-dashboard-demo
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r backend/requirements.txt"
+    startCommand: "gunicorn --chdir backend app:app --bind 0.0.0.0:$PORT"
+    envVars:
+      - key: DEMO_MODE
+        value: "true"
+      - key: FLASK_DEBUG
+        value: "false"
+      - key: ALLOWED_ORIGIN
+        value: "*"
+      - key: OCR_SPACE_API_KEY
+        sync: false  # set manually in the Render dashboard if you want OCR enabled
