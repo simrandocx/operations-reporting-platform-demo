@@ -4,7 +4,9 @@ services:
     runtime: python
     plan: free
     buildCommand: "pip install -r backend/requirements.txt"
-    startCommand: "gunicorn --chdir backend app:app --bind 0.0.0.0:$PORT"
+    # --workers 1 is intentional — see Procfile comment: visitor sandboxes
+    # live in process memory and must all land on the same worker.
+    startCommand: "gunicorn --chdir backend app:app --bind 0.0.0.0:$PORT --workers 1"
     envVars:
       - key: DEMO_MODE
         value: "true"

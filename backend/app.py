@@ -1,6 +1,6 @@
-from flask import Flask, request, jsonify, send_file, make_response
+from flask import Flask, request, jsonify, send_file, make_response, g
 from dotenv import load_dotenv
-from db import init_db, get_conn, row_to_dict, rows_to_list, DB_PATH
+from db import init_db, get_conn, row_to_dict, rows_to_list, DB_PATH, reset_sandbox, SANDBOX_MODE
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -23,12 +23,20 @@ OCR_SPACE_API_KEY = os.environ.get("OCR_SPACE_API_KEY", "")
 OCR_AVAILABLE = bool(OCR_SPACE_API_KEY)
 
 # ── Demo mode ──────────────────────────────────────────────────────────────
-# When DEMO_MODE=true (the default), the app reseeds itself with fresh
-# sample data every time it starts, and exposes a "Reset Demo Data" endpoint.
-# This keeps a public demo deployment clean and protects it from filling up
-# with junk data entered by visitors. Set DEMO_MODE=false for local/private
-# use if you don't want your entries wiped on every restart.
+# When DEMO_MODE=true (the default), the real on-disk sample data is seeded
+# once and then never touched by visitors. Instead, each visitor is given
+# their own private in-memory "sandbox" (see db.py) on their first request:
+# every read and write they make happens in that sandbox, so they can freely
+# try out the app — add a hotel, log a week's income, and so on — without
+# ever changing the real demo data or affecting any other visitor. Their
+# sandbox lives for as long as their browser holds the cookie (and the
+# server process keeps running); there's a "Reset demo data" button in the
+# UI that discards just their own sandbox. Set DEMO_MODE=false for
+# local/private use if you don't want this isolation (e.g. to test the app
+# exactly as a single real user would).
 DEMO_MODE = os.environ.get("DEMO_MODE", "true").lower() in ("1", "true", "yes")
+
+SANDBOX_COOKIE = "sandbox_id"
 
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads", "packing_lists")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -38,11 +46,25 @@ app = Flask(__name__)
 ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "*")
 
 
+@app.before_request
+def assign_sandbox():
+    # Every visitor gets a random id the first time they show up. db.py
+    # reads this (via flask.g) to route their reads/writes into their own
+    # private in-memory copy of the data instead of the real database.
+    g.sandbox_id = request.cookies.get(SANDBOX_COOKIE) or uuid.uuid4().hex
+
+
 @app.after_request
 def cors(resp):
     resp.headers["Access-Control-Allow-Origin"]  = ALLOWED_ORIGIN
     resp.headers["Access-Control-Allow-Methods"] = "GET,POST,PATCH,DELETE,OPTIONS"
     resp.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+    if SANDBOX_MODE and request.cookies.get(SANDBOX_COOKIE) != getattr(g, "sandbox_id", None):
+        resp.set_cookie(
+            SANDBOX_COOKIE, g.sandbox_id,
+            max_age=60 * 60 * 24 * 30,  # 30 days
+            samesite="Lax", httponly=True,
+        )
     return resp
 
 
@@ -1650,23 +1672,24 @@ def frontend():
 @app.get("/api/demo-info")
 def demo_info():
     """Lets the frontend show a 'this is a demo' banner and know whether
-    OCR / data-reset features are active."""
+    OCR / sandbox-reset features are active."""
     return jsonify({
         "demo_mode": DEMO_MODE,
+        "sandbox_mode": SANDBOX_MODE,
         "ocr_available": OCR_AVAILABLE,
     })
 
 
 @app.post("/api/demo-reset")
 def demo_reset():
-    """Re-seeds the database with fresh sample data. Only meaningful (and
-    only exposed to be useful) when DEMO_MODE is on; always safe to call
-    since it only ever writes synthetic sample data, never real data."""
-    if not DEMO_MODE:
-        return jsonify({"error": "Demo reset is disabled (DEMO_MODE=false)."}), 403
-    from seed import seed_demo_data
-    stats = seed_demo_data(verbose=False)
-    return jsonify({"ok": True, "reset": stats})
+    """Resets the CURRENT VISITOR's own sandbox back to the real sample
+    data. This never touches the real on-disk demo data, and never affects
+    any other visitor — each visitor's edits only ever exist in their own
+    private in-memory copy (see db.py). Always safe to call."""
+    if not SANDBOX_MODE:
+        return jsonify({"error": "Sandbox mode is disabled (DEMO_MODE=false)."}), 403
+    reset_sandbox(g.sandbox_id)
+    return jsonify({"ok": True})
 
 
 # Runs on import, so this also happens under a production WSGI server like

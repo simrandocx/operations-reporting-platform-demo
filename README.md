@@ -144,16 +144,17 @@ particular must never be committed.
 | `OCR_SPACE_API_KEY` | *(empty)* | OCR.space API key. Feature quietly disables itself when unset. |
 | `BACKUP_DIR` | `backups` | Where manual backups are copied to. |
 | `DB_PATH` | `backend/operations_demo.db` | SQLite file location. Point at a persistent disk in production. |
-| `DEMO_MODE` | `true` | Reseeds sample data on every restart + enables the in-app "Reset demo data" button. |
+| `DEMO_MODE` | `true` | Enables the reseed-on-boot behaviour and per-visitor sandboxing described below. |
+| `MAX_SANDBOX_SESSIONS` | `50` | Cap on concurrent visitor sandboxes kept in memory (oldest is evicted past this). |
 | `PORT` | `5001` | Port the server listens on (most platforms set this for you). |
 | `FLASK_DEBUG` | `false` | Flask debug mode. Keep `false` for any public deployment. |
 | `ALLOWED_ORIGIN` | `*` | CORS origin allowed to call the API. |
 
 ## Deployment
 
-This is deployed as a **public read/write demo with synthetic sample data
-only** — see the disclaimer at the top of this README. It is not the real
-internal business version.
+This is deployed as a **public demo with synthetic sample data only** —
+see the disclaimer at the top of this README. It is not the real internal
+business version.
 
 ### Platform: Render
 
@@ -171,29 +172,39 @@ Railway is also workable but no longer has a permanent free tier.
    - No blueprint? Create a **New Web Service** manually instead:
      - **Root Directory:** repo root
      - **Build Command:** `pip install -r backend/requirements.txt`
-     - **Start Command:** `gunicorn --chdir backend app:app --bind 0.0.0.0:$PORT`
+     - **Start Command:** `gunicorn --chdir backend app:app --bind 0.0.0.0:$PORT --workers 1`
 3. Under **Environment**, set any variables you want to override (e.g. `OCR_SPACE_API_KEY` if you want OCR enabled in the demo — optional, and safe to leave blank).
 4. Deploy. Render builds, installs dependencies, and starts the app. The first request may take a few seconds on the free tier (cold start after inactivity).
 5. Your demo will be live at `https://<your-service-name>.onrender.com/app`.
 
-### SQLite persistence on Render's free tier
+### How visitor data is handled (per-visitor sandboxing)
 
-Render's free web service tier does **not** provide a persistent disk —
-the filesystem is wiped on every new deploy and container restart. For a
-**public demo with only sample data**, this is actually the right
-behavior, not a risk to work around:
+A public demo needs to let recruiters actually click around and try
+adding data — but that can't mean visitors overwrite your sample data for
+everyone else, or that one visitor sees another visitor's test entries.
+This repo solves that with **per-visitor sandboxing**, not just a reset
+button:
 
-- This repo runs in **reset-on-start mode** (`DEMO_MODE=true` by default): every time the app boots, `backend/seed.py` re-populates the database with the same synthetic sample data.
-- There's also an in-app **"Reset demo data"** button (sidebar) that calls `POST /api/demo-reset`, so if a visitor's testing leaves the data looking messy, anyone can restore it instantly without redeploying.
-- Because nothing here is real data, losing "changes" on restart costs nothing — it's the simplest option and needs no extra infrastructure.
+- The first time someone opens the demo, they're issued an anonymous cookie (`sandbox_id`). Every read and write they make from then on happens inside a **private, in-memory copy** of the database, created just for them (see `backend/db.py`).
+- The real, on-disk sample data (`Hotel A`–`H`, etc.) is seeded once on boot and is **never written to by a visitor** — only ever read from, to create each new sandbox.
+- Visitors never see each other's changes: two people on the demo at once are working with two completely separate copies of the data.
+- A visitor's sandbox lives for as long as the server process keeps running (or until they clear cookies); the in-app **"Reset my changes"** banner button lets anyone wipe just their own sandbox back to the original sample data, any time, with zero effect on anyone else.
+- Sandboxes are cheap (the demo dataset is tiny) but are capped at `MAX_SANDBOX_SESSIONS` (default 50), evicting the oldest once full, so memory use can't grow unbounded.
 
-If you later want the demo's edits to persist between restarts (still with
-sample data, not real data), you have two options, in order of effort:
+This needs `gunicorn --workers 1` (already set in the `Procfile`/`render.yaml`) since sandboxes live in that one process's memory — multiple workers would each keep a separate set of sandboxes, and a visitor could land on a different one between requests. Fine for a lightweight portfolio demo; not something you'd want for real production traffic.
+
+One known gap: OCR-scanned images are still written to a shared `uploads/` folder on disk (only their *database rows* are sandboxed). In practice this just means orphaned image files can accumulate on the server over time — Render's free-tier disk is ephemeral and clears on restart anyway, so this isn't a real concern for a demo, but it's worth knowing about if you extend this further.
+
+### If you need real persistence later
+
+If you ever turn this into something more than a demo (real multi-user
+data that should survive restarts), set `DEMO_MODE=false` to disable both
+reseed-on-boot and sandboxing, then:
 
 1. **Add a Render persistent disk** (~$1/mo on Render's paid plans) and set `DB_PATH` to a path on that disk. No code changes needed — `DB_PATH` is already read from the environment.
-2. **Migrate to PostgreSQL** for a real multi-user, persistent setup (Render has a free Postgres tier). This is a bigger change — you'd swap `sqlite3` calls in `backend/db.py` for `psycopg2`/SQLAlchemy — and is really only worth doing if this stops being "just a demo." The `docs/ROADMAP.md` already flags this as the long-term path for a real deployment.
+2. **Migrate to PostgreSQL** for a real multi-user, persistent setup (Render has a free Postgres tier). This is a bigger change — you'd swap `sqlite3` calls in `backend/db.py` for `psycopg2`/SQLAlchemy. The `docs/ROADMAP.md` already flags this as the long-term path for a real deployment.
 
-For this demo, option zero (reset-on-start, as shipped) is the right call.
+For the public portfolio demo, sandboxing (as shipped) is the right call.
 
 ## Documentation
 
@@ -228,7 +239,7 @@ Checklist to run through before pushing this repo public / sharing the link:
 - [ ] No real `.db` files are committed (`git ls-files | grep '\.db$'` should return nothing).
 - [ ] `backend/backups/` and `backend/uploads/` are empty or gitignored, not committed.
 - [ ] `git log` / `git grep` show no real company, customer, or employee names anywhere in history — if in doubt, start from a fresh repo rather than trying to scrub history.
-- [ ] `DEMO_MODE=true` is set on the deployed instance (it's the default).
+- [ ] `DEMO_MODE=true` is set on the deployed instance (it's the default) — this enables per-visitor sandboxing, so visitor edits never touch the real sample data or each other.
 - [ ] `FLASK_DEBUG=false` on the deployed instance (Flask's debugger must never be exposed publicly).
 - [ ] `OCR_SPACE_API_KEY` is either left blank on the public deployment, or set as a platform environment variable — never hardcoded in `app.py`.
 - [ ] The disclaimer at the top of this README and the in-app "Demo mode" banner are both present and accurate.

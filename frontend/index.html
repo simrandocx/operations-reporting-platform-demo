@@ -300,6 +300,7 @@ const STATUS_LABELS = {
 async function api(path, opts={}) {
   const res = await fetch(API + path, {
     headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
     ...opts,
     body: opts.body ? JSON.stringify(opts.body) : undefined
   });
@@ -384,7 +385,7 @@ function Dashboard({ year, month, setPage }) {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
+    Promise.allSettled([
       api(`/monthly-results/summary/${year}/${month}`),
       api(`/monthly-results/summary/${prevYear}/${prevMonth}`),
       api(`/analytics/ranking/${year}/${month}`),
@@ -393,11 +394,24 @@ function Dashboard({ year, month, setPage }) {
       api("/backup/history"),
       api(`/monthly-status/${year}/${month}`),
     ]).then(([s, ps, r, pool, stock, bk, st]) => {
-      setSummary(s); setPrev(ps); setRanking(r);
-      setPool(pool); setRecent(stock.slice(0,6));
-      setBackup(bk); setStatuses(st);
+      const endpoints = [
+        ["/monthly-results/summary (current)", s,    setSummary],
+        ["/monthly-results/summary (previous)", ps,  setPrev],
+        ["/analytics/ranking",                  r,   setRanking],
+        ["/pool-stock/summary",                 pool, setPool],
+        ["/pool-stock",                         stock, v => setRecent(v.slice(0,6))],
+        ["/backup/history",                     bk,  setBackup],
+        ["/monthly-status",                     st,  setStatuses],
+      ];
+      endpoints.forEach(([label, result, setter]) => {
+        if (result.status === "fulfilled") {
+          setter(result.value);
+        } else {
+          console.warn(`Dashboard: failed to load ${label}`, result.reason);
+        }
+      });
       setLoading(false);
-    }).catch(() => setLoading(false));
+    });
   }, [year, month]);
 
   if (loading) return (
@@ -2843,7 +2857,8 @@ function DemoBanner({ toast }) {
   const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
-    fetch(API + "/api/demo-info").then(r => r.json()).then(setInfo).catch(() => {});
+    fetch(API + "/api/demo-info", { credentials: "same-origin" })
+      .then(r => r.json()).then(setInfo).catch(() => {});
   }, []);
 
   if (!info || !info.demo_mode) return null;
@@ -2851,9 +2866,9 @@ function DemoBanner({ toast }) {
   const handleReset = async () => {
     setResetting(true);
     try {
-      const res = await fetch(API + "/api/demo-reset", { method: "POST" });
+      const res = await fetch(API + "/api/demo-reset", { method: "POST", credentials: "same-origin" });
       if (!res.ok) throw new Error();
-      toast && toast("Demo data reset.", "ok");
+      toast && toast("Your sandbox has been reset.", "ok");
       setTimeout(() => window.location.reload(), 600);
     } catch {
       toast && toast("Reset failed.", "error");
@@ -2866,8 +2881,13 @@ function DemoBanner({ toast }) {
     <div className="demo-banner">
       <strong>Demo mode</strong> &mdash; sample/anonymised data only.
       No real company, customer, employee, or financial data.
+      {info.sandbox_mode && (
+        <> Anything you add or edit here is private to your own browser
+        session &mdash; it's never saved to the shared demo data and no
+        other visitor can see it.</>
+      )}
       <button onClick={handleReset} disabled={resetting}>
-        {resetting ? "Resetting…" : "Reset demo data"}
+        {resetting ? "Resetting…" : "Reset my changes"}
       </button>
     </div>
   );
