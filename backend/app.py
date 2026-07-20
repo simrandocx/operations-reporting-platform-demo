@@ -1,6 +1,5 @@
-from flask import Flask, request, jsonify, send_file, make_response, g
-from dotenv import load_dotenv
-from db import init_db, get_conn, row_to_dict, rows_to_list, DB_PATH, reset_sandbox, SANDBOX_MODE
+from flask import Flask, request, jsonify, send_file, make_response
+from db import init_db, get_conn, row_to_dict, rows_to_list, DB_PATH
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -8,63 +7,24 @@ import io, calendar as cal_mod, os, uuid, shutil, threading, time
 from datetime import datetime
 from collections import defaultdict
 
-load_dotenv()  # loads backend/.env locally; no-op in production if env vars
-                # are supplied directly by the hosting platform
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 # ── OCR: OCR.space ────────────────────────────────────────────────────────────
 # Free OCR API — no credit card needed, 25,000 pages/month free.
 # Get a free key at: https://ocr.space/ocrapi (click "Get API Key Free")
-# Set OCR_SPACE_API_KEY in backend/.env locally, or as an environment
-# variable on your hosting platform. Never hardcode the key here.
-OCR_SPACE_API_KEY = os.environ.get("OCR_SPACE_API_KEY", "")
+OCR_SPACE_API_KEY = ""  # ← paste your key here e.g. "K8XXXXXXXXXXXXXXXXXX"
 
 OCR_AVAILABLE = bool(OCR_SPACE_API_KEY)
 
-# ── Demo mode ──────────────────────────────────────────────────────────────
-# When DEMO_MODE=true (the default), the real on-disk sample data is seeded
-# once and then never touched by visitors. Instead, each visitor is given
-# their own private in-memory "sandbox" (see db.py) on their first request:
-# every read and write they make happens in that sandbox, so they can freely
-# try out the app — add a hotel, log a week's income, and so on — without
-# ever changing the real demo data or affecting any other visitor. Their
-# sandbox lives for as long as their browser holds the cookie (and the
-# server process keeps running); there's a "Reset demo data" button in the
-# UI that discards just their own sandbox. Set DEMO_MODE=false for
-# local/private use if you don't want this isolation (e.g. to test the app
-# exactly as a single real user would).
-DEMO_MODE = os.environ.get("DEMO_MODE", "true").lower() in ("1", "true", "yes")
-
-SANDBOX_COOKIE = "sandbox_id"
-
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads", "packing_lists")
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads", "packing_lists")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = Flask(__name__)
 
-ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "*")
-
-
-@app.before_request
-def assign_sandbox():
-    # Every visitor gets a random id the first time they show up. db.py
-    # reads this (via flask.g) to route their reads/writes into their own
-    # private in-memory copy of the data instead of the real database.
-    g.sandbox_id = request.cookies.get(SANDBOX_COOKIE) or uuid.uuid4().hex
-
 
 @app.after_request
 def cors(resp):
-    resp.headers["Access-Control-Allow-Origin"]  = ALLOWED_ORIGIN
+    resp.headers["Access-Control-Allow-Origin"]  = "*"
     resp.headers["Access-Control-Allow-Methods"] = "GET,POST,PATCH,DELETE,OPTIONS"
     resp.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
-    if SANDBOX_MODE and request.cookies.get(SANDBOX_COOKIE) != getattr(g, "sandbox_id", None):
-        resp.set_cookie(
-            SANDBOX_COOKIE, g.sandbox_id,
-            max_age=60 * 60 * 24 * 30,  # 30 days
-            samesite="Lax", httponly=True,
-        )
     return resp
 
 
@@ -691,6 +651,72 @@ def pool_stock_summary(year, month):
     })
 
 
+@app.get("/pool-stock/hotel-grid/<int:hotel_id>")
+def pool_stock_hotel_grid(hotel_id):
+    """
+    Returns pool stock entries for a hotel as a horizontal grid:
+    rows = dates, columns = linen items (in template order).
+    Matches the Excel format the manager uses for weekly summaries.
+    """
+    year  = request.args.get("year",  type=int)
+    month = request.args.get("month", type=int)
+
+    conn  = get_conn()
+    hotel = row_to_dict(conn.execute("SELECT * FROM hotels WHERE id=?", (hotel_id,)).fetchone())
+    if not hotel:
+        conn.close()
+        return jsonify({"error": "Hotel not found"}), 404
+
+    sql    = "SELECT * FROM pool_stock WHERE hotel_id=?"
+    params = [hotel_id]
+    if year and month:
+        last = cal_mod.monthrange(year, month)[1]
+        sql += " AND entry_date BETWEEN ? AND ?"
+        params += [f"{year}-{month:02d}-01", f"{year}-{month:02d}-{last:02d}"]
+    sql += " ORDER BY entry_date"
+
+    entries = rows_to_list(conn.execute(sql, params).fetchall())
+    conn.close()
+
+    # Get the hotel's linen template (column order)
+    columns = _get_hotel_template(hotel["name"])
+
+    # Build pivot: date → { linen_item: quantity }
+    from collections import defaultdict as _dd
+    pivot = _dd(lambda: {col: 0 for col in columns})
+    for e in entries:
+        pivot[e["entry_date"]][e["linen_item"]] = e["quantity"]
+
+    # Sorted date rows
+    rows = []
+    for date_str in sorted(pivot.keys()):
+        row = {"date": date_str}
+        total = 0
+        for col in columns:
+            qty = pivot[date_str].get(col, 0)
+            row[col] = qty if qty else ""
+            total += qty if qty else 0
+        row["_total"] = total
+        rows.append(row)
+
+    # Totals row
+    if rows:
+        totals = {"date": "TOTAL", "_total": 0}
+        for col in columns:
+            col_sum = sum(int(r[col]) for r in rows if r[col] != "")
+            totals[col] = col_sum if col_sum else ""
+            totals["_total"] += col_sum
+        rows.append(totals)
+
+    return jsonify({
+        "hotel_id":   hotel_id,
+        "hotel_name": hotel["name"],
+        "columns":    columns,
+        "rows":       rows,
+        "year": year, "month": month,
+    })
+
+
 # ────────────────────────────────────────────────────────────────────────────
 # PACKING LIST SCANNER  (photo upload → OCR → review screen → confirm & save)
 # ────────────────────────────────────────────────────────────────────────────
@@ -703,7 +729,7 @@ ALLOWED_EXTENSIONS = {"jpg","jpeg","png","heic"}
 # Replace the keys below with your actual customer names to enable template matching.
 
 HOTEL_TEMPLATES = {
-    "Hotel A": [
+    "The Soho Hotel": [
         "Single Sheets","Queen Sheets","King Sheets",
         "Single Duvet Covers","Double Duvet Covers","Emperor King Duvet Covers",
         "Queen Pillow Cases","King Pillow Cases",
@@ -714,7 +740,7 @@ HOTEL_TEMPLATES = {
         "FH Napkins","Table Runners","Events Large Table Runners",
         "Small Tray Cloths","Large Tray Cloths","Glass Cloths","Oven Cloths",
     ],
-    "Hotel B": [
+    "Ham Yard Hotel": [
         "Single Sheets","Single Duvet Covers","Emperor King Duvet Covers",
         "Double Duvet Covers","King Sheets",
         "Queen Pillow Cases","Single Bedspreads","King Bedspreads",
@@ -727,7 +753,7 @@ HOTEL_TEMPLATES = {
         "Ferguson Round Table Cloths","Medium Table Cloths 180X270",
         "Glass Cloths","Oven Cloths",
     ],
-    "Hotel C": [
+    "Covent Garden Hotel": [
         "Single Sheets","Queen Sheets","King Sheets",
         "Single Duvet Covers","Queen Duvet Covers","Emperor Duvet Covers",
         "Double Duvet Covers","Queen Pillow Cases","King Pillow Cases",
@@ -738,7 +764,7 @@ HOTEL_TEMPLATES = {
         "Large Round Table Cloths","Table Napkins","FH Napkins","Table Runners",
         "Small Tray Cloths","Large Tray Cloths","Glass Cloths","Oven Cloths",
     ],
-    "Hotel D": [
+    "Charlotte Street Hotel": [
         "Single Sheets","Queen Sheets","King Sheets",
         "Single Duvet Covers","Double Duvet Covers",
         "Queen Duvet Covers","Emperor Duvet Covers",
@@ -752,7 +778,7 @@ HOTEL_TEMPLATES = {
         "Small Tray Cloths","Large Tray Cloths",
         "Glass Cloths","Kitchen Cloths","Oven Cloths",
     ],
-    "Hotel E": [
+    "Haymarket Hotel": [
         "Single Sheets","Queen Sheets","King Sheets",
         "Single Duvet Covers","Double Duvet Covers",
         "King Duvet Covers","Emperor Duvet Covers",
@@ -765,7 +791,7 @@ HOTEL_TEMPLATES = {
         "Round Table Cloths","Large Table Cloths 225X235","FH Napkins",
         "Table Runners","Small Tray Cloths","Glass Cloths","Oven Cloths",
     ],
-    "Hotel F": [
+    "Knightsbridge Hotel": [
         "Single Sheets","Queen Sheets","King Sheets",
         "Single Duvet Covers","Queen Duvet Covers",
         "King Duvet Covers","Emperor Duvet Covers",
@@ -780,7 +806,7 @@ HOTEL_TEMPLATES = {
         "Small Tray Cloths","Large Tray Cloths","Table Runners",
         "Kitchen Cloths","Oven Cloths",
     ],
-    "Hotel G": [
+    "Dorset Square Hotel": [
         "Single Sheets","Queen Sheets","King Sheets",
         "Single Duvet Covers","Double Duvet Covers",
         "Queen Duvet Covers","Emperor Duvet Covers",
@@ -797,7 +823,7 @@ HOTEL_TEMPLATES = {
         "Small Tray Cloths","Large Tray Cloths",
         "Glass Cloths","Kitchen Cloths","Oven Cloths",
     ],
-    "Hotel H": [
+    "Number Sixteen": [
         "Single Sheets","Queen Sheets","King Sheets",
         "Single Duvet Covers","Double Duvet Covers","Emperor King Duvet Covers",
         "Queen Pillow Cases","King Pillow Cases",
@@ -1316,14 +1342,14 @@ def export_ranking():
 # reminder shown by the frontend in the late afternoon. There is no automatic
 # timer running in the background — keeping this simple and predictable.
 #
-# BACKUP_DIR can be overridden via the BACKUP_DIR environment variable, e.g.
-# to point at a synced cloud folder (OneDrive, Dropbox, etc.) on a real
-# deployment. As shipped, it backs up into a local "backups" folder next to
-# the database, which is fine for local use and for this public demo, but
-# on most free hosting tiers the filesystem is not persistent — see the
-# README's "Deployment" section for details.
+# IMPORTANT FOR DEPLOYMENT: change BACKUP_DIR below to point at her OneDrive
+# folder on the work computer, e.g.:
+#   BACKUP_DIR = r"C:\Users\HerName\OneDrive - YourCompany\laundry-backups"
+# As shipped, it backs up into a local "backups" folder next to the database,
+# which is safe for testing but does NOT protect against the computer itself
+# being wiped or lost.
 
-BACKUP_DIR = os.environ.get("BACKUP_DIR", os.path.join(BASE_DIR, "backups"))
+BACKUP_DIR = os.path.join(os.path.dirname(__file__), "backups")
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
 MAX_BACKUPS_KEPT = 60  # roughly 2-3 months of daily backups before the oldest get cleaned up
@@ -1660,46 +1686,11 @@ def export_petty_cash(year, month):
 
 
 # ────────────────────────────────────────────────────────────────────────────
-FRONTEND_PATH = os.path.join(BASE_DIR, "..", "frontend", "index.html")
-
-
-@app.route("/")
 @app.route("/app")
 def frontend():
-    return send_file(FRONTEND_PATH)
+    return send_file("../frontend/index.html")
 
-
-@app.get("/api/demo-info")
-def demo_info():
-    """Lets the frontend show a 'this is a demo' banner and know whether
-    OCR / sandbox-reset features are active."""
-    return jsonify({
-        "demo_mode": DEMO_MODE,
-        "sandbox_mode": SANDBOX_MODE,
-        "ocr_available": OCR_AVAILABLE,
-    })
-
-
-@app.post("/api/demo-reset")
-def demo_reset():
-    """Resets the CURRENT VISITOR's own sandbox back to the real sample
-    data. This never touches the real on-disk demo data, and never affects
-    any other visitor — each visitor's edits only ever exist in their own
-    private in-memory copy (see db.py). Always safe to call."""
-    if not SANDBOX_MODE:
-        return jsonify({"error": "Sandbox mode is disabled (DEMO_MODE=false)."}), 403
-    reset_sandbox(g.sandbox_id)
-    return jsonify({"ok": True})
-
-
-# Runs on import, so this also happens under a production WSGI server like
-# gunicorn (which imports this module rather than executing __main__).
-init_db()
-if DEMO_MODE:
-    from seed import seed_demo_data
-    seed_demo_data()
 
 if __name__ == "__main__":
-    debug = os.environ.get("FLASK_DEBUG", "false").lower() in ("1", "true", "yes")
-    port = int(os.environ.get("PORT", 5001))
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    init_db()
+    app.run(debug=True, port=5001)

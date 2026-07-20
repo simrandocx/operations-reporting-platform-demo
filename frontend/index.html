@@ -72,20 +72,6 @@
   .nav-item.active { background: rgba(255,255,255,0.13); color: #fff; }
   .nav-item .icon  { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
 
-  .demo-banner {
-    margin: 12px 14px; padding: 10px 12px;
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 8px; font-size: 11px; line-height: 1.5;
-    color: rgba(255,255,255,0.6);
-  }
-  .demo-banner strong { color: rgba(255,255,255,0.85); }
-  .demo-banner button {
-    margin-top: 8px; width: 100%; padding: 6px 8px; font-size: 11px;
-    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-    color: rgba(255,255,255,0.8); border-radius: 6px; cursor: pointer;
-  }
-  .demo-banner button:hover { background: rgba(255,255,255,0.15); color: #fff; }
-
   /* ── Main ── */
   .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
@@ -300,7 +286,6 @@ const STATUS_LABELS = {
 async function api(path, opts={}) {
   const res = await fetch(API + path, {
     headers: { "Content-Type": "application/json" },
-    credentials: "same-origin",
     ...opts,
     body: opts.body ? JSON.stringify(opts.body) : undefined
   });
@@ -385,7 +370,7 @@ function Dashboard({ year, month, setPage }) {
 
   useEffect(() => {
     setLoading(true);
-    Promise.allSettled([
+    Promise.all([
       api(`/monthly-results/summary/${year}/${month}`),
       api(`/monthly-results/summary/${prevYear}/${prevMonth}`),
       api(`/analytics/ranking/${year}/${month}`),
@@ -394,24 +379,11 @@ function Dashboard({ year, month, setPage }) {
       api("/backup/history"),
       api(`/monthly-status/${year}/${month}`),
     ]).then(([s, ps, r, pool, stock, bk, st]) => {
-      const endpoints = [
-        ["/monthly-results/summary (current)", s,    setSummary],
-        ["/monthly-results/summary (previous)", ps,  setPrev],
-        ["/analytics/ranking",                  r,   setRanking],
-        ["/pool-stock/summary",                 pool, setPool],
-        ["/pool-stock",                         stock, v => setRecent(v.slice(0,6))],
-        ["/backup/history",                     bk,  setBackup],
-        ["/monthly-status",                     st,  setStatuses],
-      ];
-      endpoints.forEach(([label, result, setter]) => {
-        if (result.status === "fulfilled") {
-          setter(result.value);
-        } else {
-          console.warn(`Dashboard: failed to load ${label}`, result.reason);
-        }
-      });
+      setSummary(s); setPrev(ps); setRanking(r);
+      setPool(pool); setRecent(stock.slice(0,6));
+      setBackup(bk); setStatuses(st);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, [year, month]);
 
   if (loading) return (
@@ -1088,6 +1060,103 @@ function MonthlyResultsPage({ year, month, toast }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // QUICK ENTRY — one item at a time, keyboard only, for fast pool stock entry
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// HOTEL STOCK GRID — horizontal summary matching her Excel format
+// Shown after Quick Entry completes and also accessible from Pool Stock page
+// ─────────────────────────────────────────────────────────────────────────────
+function HotelStockGrid({ hotel_id, hotel_name, year, month, onClose }) {
+  const [grid, setGrid]     = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    api(`/pool-stock/hotel-grid/${hotel_id}?year=${year}&month=${month}`)
+      .then(d => { setGrid(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [hotel_id, year, month]);
+
+  if (loading) return (
+    <div className="card section-gap">
+      <div className="card-body" style={{textAlign:"center",padding:32}}>
+        <div className="spinner"></div>
+        <div className="text-soft" style={{marginTop:12}}>Loading summary…</div>
+      </div>
+    </div>
+  );
+
+  if (!grid || grid.rows.length === 0) return (
+    <div className="card section-gap">
+      <div className="card-header">
+        <span className="card-title">Pool Stock Summary — {hotel_name}</span>
+        <button className="btn btn-secondary btn-xs" onClick={onClose}>× Close</button>
+      </div>
+      <div className="card-body">
+        <div className="empty-state">
+          <div className="empty-icon">🛏</div>
+          <div className="empty-title">No entries yet</div>
+          <div>Use Quick Entry or Add entry to start tracking pool stock for {hotel_name}.</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const dataRows  = grid.rows.filter(r => r.date !== "TOTAL");
+  const totalRow  = grid.rows.find(r => r.date === "TOTAL");
+  const columns   = grid.columns;
+
+  return (
+    <div className="card section-gap">
+      <div className="card-header">
+        <span className="card-title">Pool Stock Summary — {hotel_name} — {MONTHS[month]} {year}</span>
+        <button className="btn btn-secondary btn-xs" onClick={onClose}>× Close</button>
+      </div>
+      <div className="tbl-wrap" style={{overflowX:"auto"}}>
+        <table style={{fontSize:11, minWidth: columns.length * 70 + 100}}>
+          <thead>
+            <tr>
+              <th style={{minWidth:90, textAlign:"left", position:"sticky", left:0, background:"var(--sky)", zIndex:2}}>Date</th>
+              {columns.map(col => (
+                <th key={col} style={{minWidth:65, textAlign:"right", fontSize:10, whiteSpace:"normal", lineHeight:1.2, maxWidth:80, wordBreak:"break-word"}}>
+                  {col}
+                </th>
+              ))}
+              <th style={{minWidth:60, textAlign:"right", fontWeight:700}}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dataRows.map((row, i) => (
+              <tr key={i} style={{background: i%2===0?"transparent":"#FAFBFD"}}>
+                <td className="mono" style={{fontSize:11, fontWeight:500, position:"sticky", left:0, background: i%2===0?"#fff":"#FAFBFD"}}>
+                  {row.date}
+                </td>
+                {columns.map(col => (
+                  <td key={col} className="num mono" style={{fontSize:11, color: row[col] ? "var(--navy)" : "var(--ink-soft)"}}>
+                    {row[col] || "—"}
+                  </td>
+                ))}
+                <td className="num mono" style={{fontWeight:600, color:"var(--navy)"}}>{row._total || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+          {totalRow && (
+            <tfoot>
+              <tr className="tfoot-row">
+                <td style={{position:"sticky", left:0, background:"var(--navy)", color:"#fff"}}><strong>TOTAL</strong></td>
+                {columns.map(col => (
+                  <td key={col} className="num mono" style={{fontSize:11}}>
+                    {totalRow[col] || "—"}
+                  </td>
+                ))}
+                <td className="num mono" style={{fontWeight:700}}>{totalRow._total}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function QuickEntry({ hotel, date, items, onDone, toast }) {
   const [idx, setIdx]       = useState(0);
   const [values, setValues] = useState(() => Object.fromEntries(items.map(i => [i, ""])));
@@ -1254,6 +1323,7 @@ function PoolStockPage({ year, month, toast }) {
   const [quickEntry, setQuickEntry] = useState(null); // { hotel, date, items }
   const [quickForm, setQuickForm] = useState({ hotel_id:"", entry_date:"" });
   const [showQuickSetup, setShowQuickSetup] = useState(false);
+  const [gridView, setGridView] = useState(null); // { hotel_id, hotel_name, year, month } — shown after quick entry
 
   // Photo scan state
   const [showScanUpload, setShowScanUpload] = useState(false);
@@ -1314,14 +1384,14 @@ function PoolStockPage({ year, month, toast }) {
   };
 
   const HOTEL_TEMPLATES_JS = {
-    "Hotel A": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","Emperor King Duvet Covers","Queen Pillow Cases","King Pillow Cases","Scallop King Bedspreads","Escallop Single Bedspreads","Queen Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes - Green","Small Table Cloths 54x54","Round Table Cloths","Large Table Cloths 225x235","FH Napkins","Table Runners","Events Large Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Oven Cloths"],
-    "Hotel B": ["Single Sheets","Single Duvet Covers","Emperor King Duvet Covers","Double Duvet Covers","King Sheets","Queen Pillow Cases","Single Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Spa Jumbo Bath Sheets","Bathrobes","Ferguson Table Cloths 54X54","Ferguson Napkins","Old Style Table Napkins","Old Style Table Cloth 54X54","Large Table Cloths 225X235","Round Table Cloths","FH Napkins","Small Tray Cloths","Large Tray Cloths","Ferguson Round Table Cloths","Medium Table Cloths 180X270","Glass Cloths","Oven Cloths"],
-    "Hotel C": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Queen Duvet Covers","Emperor Duvet Covers","Double Duvet Covers","Queen Pillow Cases","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes","Small Table Cloths 54X54","Medium Table Cloths 180X270","Large Round Table Cloths","Table Napkins","FH Napkins","Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Oven Cloths"],
-    "Hotel D": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","Queen Duvet Covers","Emperor Duvet Covers","Queen Pillow Cases","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes - Orange","Small Table Cloths 54X54","Medium Table Cloths 180X270","Large Round Table Cloths","Large Table Cloths 225X235","FH Napkins","Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Kitchen Cloths","Oven Cloths"],
-    "Hotel E": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","King Duvet Covers","Emperor Duvet Covers","Queen Pillow Cases","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes - Red","Ferguson Table Cloths 54X54","Ferguson Table Cloths 108X108","Ferguson Napkins (new)","Ferguson Napkins (old)","Round Table Cloths","Large Table Cloths 225X235","FH Napkins","Table Runners","Small Tray Cloths","Glass Cloths","Oven Cloths"],
-    "Hotel F": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Queen Duvet Covers","King Duvet Covers","Emperor Duvet Covers","Double Duvet Covers (for twins)","King Pillow Cases","Queen Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Super King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Big Bath Mats","Face Cloths","Bathrobes - Red","FH Napkins","Small Tray Cloths","Large Tray Cloths","Table Runners","Kitchen Cloths","Oven Cloths"],
-    "Hotel G": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","Queen Duvet Covers","Emperor Duvet Covers","Queen Duvet Covers (Twin beds)","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Extra King Bedspreads","Hand Towels","Bath Towels","Face Cloths","Bath Mats","Bath Sheets","Bathrobes - Blue Velour","Satin Band Table Cloths 54X54","Large Table Cloths 54X54","Large Round Table Cloths","Large Table Cloths 225X235","FH Napkins","Pure Linen Napkins","Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Kitchen Cloths","Oven Cloths"],
-    "Hotel H": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","Emperor King Duvet Covers","Queen Pillow Cases","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes - Green","Small Table Cloths 54X54","Medium Table Cloths 180X270","Large Round Table Cloths","Large Table Cloths 225X235","FH Napkins","Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Oven Cloths"],
+    "The Soho Hotel": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","Emperor King Duvet Covers","Queen Pillow Cases","King Pillow Cases","Scallop King Bedspreads","Escallop Single Bedspreads","Queen Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes - Green","Small Table Cloths 54x54","Round Table Cloths","Large Table Cloths 225x235","FH Napkins","Table Runners","Events Large Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Oven Cloths"],
+    "Ham Yard Hotel": ["Single Sheets","Single Duvet Covers","Emperor King Duvet Covers","Double Duvet Covers","King Sheets","Queen Pillow Cases","Single Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Spa Jumbo Bath Sheets","Bathrobes","Ferguson Table Cloths 54X54","Ferguson Napkins","Old Style Table Napkins","Old Style Table Cloth 54X54","Large Table Cloths 225X235","Round Table Cloths","FH Napkins","Small Tray Cloths","Large Tray Cloths","Ferguson Round Table Cloths","Medium Table Cloths 180X270","Glass Cloths","Oven Cloths"],
+    "Covent Garden Hotel": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Queen Duvet Covers","Emperor Duvet Covers","Double Duvet Covers","Queen Pillow Cases","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes","Small Table Cloths 54X54","Medium Table Cloths 180X270","Large Round Table Cloths","Table Napkins","FH Napkins","Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Oven Cloths"],
+    "Charlotte Street Hotel": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","Queen Duvet Covers","Emperor Duvet Covers","Queen Pillow Cases","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes - Orange","Small Table Cloths 54X54","Medium Table Cloths 180X270","Large Round Table Cloths","Large Table Cloths 225X235","FH Napkins","Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Kitchen Cloths","Oven Cloths"],
+    "Haymarket Hotel": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","King Duvet Covers","Emperor Duvet Covers","Queen Pillow Cases","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes - Red","Ferguson Table Cloths 54X54","Ferguson Table Cloths 108X108","Ferguson Napkins (new)","Ferguson Napkins (old)","Round Table Cloths","Large Table Cloths 225X235","FH Napkins","Table Runners","Small Tray Cloths","Glass Cloths","Oven Cloths"],
+    "Knightsbridge Hotel": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Queen Duvet Covers","King Duvet Covers","Emperor Duvet Covers","Double Duvet Covers (for twins)","King Pillow Cases","Queen Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Super King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Big Bath Mats","Face Cloths","Bathrobes - Red","FH Napkins","Small Tray Cloths","Large Tray Cloths","Table Runners","Kitchen Cloths","Oven Cloths"],
+    "Dorset Square Hotel": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","Queen Duvet Covers","Emperor Duvet Covers","Queen Duvet Covers (Twin beds)","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Extra King Bedspreads","Hand Towels","Bath Towels","Face Cloths","Bath Mats","Bath Sheets","Bathrobes - Blue Velour","Satin Band Table Cloths 54X54","Large Table Cloths 54X54","Large Round Table Cloths","Large Table Cloths 225X235","FH Napkins","Pure Linen Napkins","Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Kitchen Cloths","Oven Cloths"],
+    "Number Sixteen": ["Single Sheets","Queen Sheets","King Sheets","Single Duvet Covers","Double Duvet Covers","Emperor King Duvet Covers","Queen Pillow Cases","King Pillow Cases","Single Bedspreads","Queen Bedspreads","King Bedspreads","Hand Towels","Bath Towels","Bath Sheets","Bath Mats","Face Cloths","Bathrobes - Green","Small Table Cloths 54X54","Medium Table Cloths 180X270","Large Round Table Cloths","Large Table Cloths 225X235","FH Napkins","Table Runners","Small Tray Cloths","Large Tray Cloths","Glass Cloths","Oven Cloths"],
   };
 
   const _getHotelTemplate = (hotelName) => {
@@ -1433,7 +1503,11 @@ function PoolStockPage({ year, month, toast }) {
           date={quickEntry.date}
           items={quickEntry.items}
           toast={toast}
-          onDone={() => { setQuickEntry(null); load(); }}
+          onDone={() => {
+            setQuickEntry(null);
+            setGridView({ hotel_id: quickEntry.hotel.id, hotel_name: quickEntry.hotel.name, year, month });
+            load();
+          }}
         />
       )}
 
@@ -1482,6 +1556,16 @@ function PoolStockPage({ year, month, toast }) {
             </div>
           </div>
         </div>
+      )}
+
+      {gridView && (
+        <HotelStockGrid
+          hotel_id={gridView.hotel_id}
+          hotel_name={gridView.hotel_name}
+          year={gridView.year}
+          month={gridView.month}
+          onClose={() => setGridView(null)}
+        />
       )}
 
       {summary && Object.keys(summary.checks.duplicate_packing_list_refs||{}).length > 0 && (
@@ -2852,47 +2936,6 @@ function BackupReminder() {
   );
 }
 
-function DemoBanner({ toast }) {
-  const [info, setInfo] = useState(null);
-  const [resetting, setResetting] = useState(false);
-
-  useEffect(() => {
-    fetch(API + "/api/demo-info", { credentials: "same-origin" })
-      .then(r => r.json()).then(setInfo).catch(() => {});
-  }, []);
-
-  if (!info || !info.demo_mode) return null;
-
-  const handleReset = async () => {
-    setResetting(true);
-    try {
-      const res = await fetch(API + "/api/demo-reset", { method: "POST", credentials: "same-origin" });
-      if (!res.ok) throw new Error();
-      toast && toast("Your sandbox has been reset.", "ok");
-      setTimeout(() => window.location.reload(), 600);
-    } catch {
-      toast && toast("Reset failed.", "error");
-    } finally {
-      setResetting(false);
-    }
-  };
-
-  return (
-    <div className="demo-banner">
-      <strong>Demo mode</strong> &mdash; sample/anonymised data only.
-      No real company, customer, employee, or financial data.
-      {info.sandbox_mode && (
-        <> Anything you add or edit here is private to your own browser
-        session &mdash; it's never saved to the shared demo data and no
-        other visitor can see it.</>
-      )}
-      <button onClick={handleReset} disabled={resetting}>
-        {resetting ? "Resetting…" : "Reset my changes"}
-      </button>
-    </div>
-  );
-}
-
 function App() {
   const [page, setPage] = useState("dashboard");
   const now = new Date();
@@ -2930,7 +2973,6 @@ function App() {
             </button>
           ))}
         </div>
-        <DemoBanner toast={toast} />
       </nav>
 
       <div className="main">
