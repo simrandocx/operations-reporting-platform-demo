@@ -1065,7 +1065,7 @@ function MonthlyResultsPage({ year, month, toast }) {
 // Shown after Quick Entry completes and also accessible from Pool Stock page
 // ─────────────────────────────────────────────────────────────────────────────
 function HotelStockGrid({ hotel_id, hotel_name, year, month, onClose }) {
-  const [grid, setGrid]     = useState(null);
+  const [grid, setGrid]       = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1088,74 +1088,107 @@ function HotelStockGrid({ hotel_id, hotel_name, year, month, onClose }) {
     <div className="card section-gap">
       <div className="card-header">
         <span className="card-title">Pool Stock Summary — {hotel_name}</span>
-        <button className="btn btn-secondary btn-xs" onClick={onClose}>× Close</button>
+        {onClose && <button className="btn btn-secondary btn-xs" onClick={onClose}>× Close</button>}
       </div>
       <div className="card-body">
         <div className="empty-state">
           <div className="empty-icon">🛏</div>
-          <div className="empty-title">No entries yet</div>
-          <div>Use Quick Entry or Add entry to start tracking pool stock for {hotel_name}.</div>
+          <div className="empty-title">No entries yet for {hotel_name}</div>
+          <div>Use Quick Entry to start adding pool stock.</div>
         </div>
       </div>
     </div>
   );
 
-  const dataRows  = grid.rows.filter(r => r.date !== "TOTAL");
-  const totalRow  = grid.rows.find(r => r.date === "TOTAL");
-  const columns   = grid.columns;
+  const columns  = grid.columns;
+  const dataRows = grid.rows.filter(r => r.date !== "TOTAL");
+  const totalRow = grid.rows.find(r => r.date === "TOTAL");
+
+  // Build per-item totals: item → sum across all dates
+  const itemTotals = {};
+  columns.forEach(col => {
+    itemTotals[col] = dataRows.reduce((s, r) => s + (parseInt(r[col]) || 0), 0);
+  });
+
+  // Dates that have any data
+  const activeDates = dataRows.filter(r => r._total > 0);
 
   return (
     <div className="card section-gap">
       <div className="card-header">
-        <span className="card-title">Pool Stock Summary — {hotel_name} — {MONTHS[month]} {year}</span>
-        <button className="btn btn-secondary btn-xs" onClick={onClose}>× Close</button>
+        <span className="card-title">Pool Stock — {hotel_name} — {MONTHS[month]} {year}</span>
+        <div className="flex gap-8">
+          {onClose && <button className="btn btn-secondary btn-xs" onClick={onClose}>× Close</button>}
+        </div>
       </div>
-      <div className="tbl-wrap" style={{overflowX:"auto"}}>
-        <table style={{fontSize:11, minWidth: columns.length * 70 + 100}}>
+
+      {/* KPI row */}
+      <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, padding:"12px 20px 0"}}>
+        <div className="kpi-card" style={{padding:"12px 16px"}}>
+          <div className="kpi-label">Total Items</div>
+          <div className="kpi-value" style={{fontSize:24}}>{totalRow?._total?.toLocaleString() || 0}</div>
+        </div>
+        <div className="kpi-card" style={{padding:"12px 16px"}}>
+          <div className="kpi-label">Deliveries</div>
+          <div className="kpi-value" style={{fontSize:24}}>{activeDates.length}</div>
+        </div>
+        <div className="kpi-card" style={{padding:"12px 16px"}}>
+          <div className="kpi-label">Item Types</div>
+          <div className="kpi-value" style={{fontSize:24}}>{columns.filter(c => itemTotals[c] > 0).length}</div>
+        </div>
+      </div>
+
+      {/* Vertical item list — one row per linen item */}
+      <div className="tbl-wrap" style={{marginTop:16}}>
+        <table>
           <thead>
             <tr>
-              <th style={{minWidth:90, textAlign:"left", position:"sticky", left:0, background:"var(--sky)", zIndex:2}}>Date</th>
-              {columns.map(col => (
-                <th key={col} style={{minWidth:65, textAlign:"right", fontSize:10, whiteSpace:"normal", lineHeight:1.2, maxWidth:80, wordBreak:"break-word"}}>
-                  {col}
-                </th>
+              <th style={{minWidth:220, textAlign:"left"}}>Linen Item</th>
+              {activeDates.map(r => (
+                <th key={r.date} style={{textAlign:"right", minWidth:80, fontSize:11}}>{r.date}</th>
               ))}
-              <th style={{minWidth:60, textAlign:"right", fontWeight:700}}>Total</th>
+              <th style={{textAlign:"right", minWidth:80, fontWeight:700}}>Total</th>
             </tr>
           </thead>
           <tbody>
-            {dataRows.map((row, i) => (
-              <tr key={i} style={{background: i%2===0?"transparent":"#FAFBFD"}}>
-                <td className="mono" style={{fontSize:11, fontWeight:500, position:"sticky", left:0, background: i%2===0?"#fff":"#FAFBFD"}}>
-                  {row.date}
-                </td>
-                {columns.map(col => (
-                  <td key={col} className="num mono" style={{fontSize:11, color: row[col] ? "var(--navy)" : "var(--ink-soft)"}}>
-                    {row[col] || "—"}
-                  </td>
-                ))}
-                <td className="num mono" style={{fontWeight:600, color:"var(--navy)"}}>{row._total || "—"}</td>
-              </tr>
-            ))}
+            {columns.map((col, i) => {
+              const total = itemTotals[col];
+              if (total === 0) return null; // hide items with no entries
+              return (
+                <tr key={col} style={{background: i%2===0?"transparent":"#FAFBFD"}}>
+                  <td style={{fontWeight:500, fontSize:13}}>{col}</td>
+                  {activeDates.map(r => (
+                    <td key={r.date} className="num mono" style={{fontSize:12, color: r[col] ? "var(--navy)" : "var(--ink-soft)"}}>
+                      {r[col] || "—"}
+                    </td>
+                  ))}
+                  <td className="num mono" style={{fontWeight:700, color:"var(--navy)"}}>{total}</td>
+                </tr>
+              );
+            })}
           </tbody>
-          {totalRow && (
-            <tfoot>
-              <tr className="tfoot-row">
-                <td style={{position:"sticky", left:0, background:"var(--navy)", color:"#fff"}}><strong>TOTAL</strong></td>
-                {columns.map(col => (
-                  <td key={col} className="num mono" style={{fontSize:11}}>
-                    {totalRow[col] || "—"}
-                  </td>
-                ))}
-                <td className="num mono" style={{fontWeight:700}}>{totalRow._total}</td>
-              </tr>
-            </tfoot>
-          )}
+          <tfoot>
+            <tr className="tfoot-row">
+              <td><strong>TOTAL</strong></td>
+              {activeDates.map(r => (
+                <td key={r.date} className="num mono" style={{fontSize:12}}>{r._total || "—"}</td>
+              ))}
+              <td className="num mono" style={{fontWeight:700}}>{totalRow?._total || 0}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
+
+      {/* Show items with no entries collapsed */}
+      {columns.filter(c => itemTotals[c] === 0).length > 0 && (
+        <div className="text-soft" style={{fontSize:12, padding:"8px 20px 16px"}}>
+          {columns.filter(c => itemTotals[c] === 0).length} items with no entries hidden
+        </div>
+      )}
     </div>
   );
 }
+
 
 function QuickEntry({ hotel, date, items, onDone, toast }) {
   const [idx, setIdx]       = useState(0);
@@ -1320,10 +1353,11 @@ function PoolStockPage({ year, month, toast }) {
   const [filter, setFilter] = useState({ hotel_id:"", linen_item:"", ref:"", date:"" });
 
   // Quick entry state
-  const [quickEntry, setQuickEntry] = useState(null); // { hotel, date, items }
+  const [quickEntry, setQuickEntry] = useState(null);
   const [quickForm, setQuickForm] = useState({ hotel_id:"", entry_date:"" });
   const [showQuickSetup, setShowQuickSetup] = useState(false);
-  const [gridView, setGridView] = useState(null); // { hotel_id, hotel_name, year, month } — shown after quick entry
+  const [gridView, setGridView] = useState(null);
+  const [activeSummaryHotel, setActiveSummaryHotel] = useState(null); // selected hotel for summary tab
 
   // Photo scan state
   const [showScanUpload, setShowScanUpload] = useState(false);
@@ -1343,7 +1377,9 @@ function PoolStockPage({ year, month, toast }) {
       api("/hotels"),
       api(`/pool-stock/summary/${year}/${month}`),
     ]).then(([e, h, s]) => {
-      setEntries(e); setHotels(h.filter(x=>x.active_status)); setSummary(s);
+      const active = h.filter(x=>x.active_status);
+      setEntries(e); setHotels(active); setSummary(s);
+      if (!activeSummaryHotel && active.length) setActiveSummaryHotel(active[0]);
     });
   }, [year, month, filter]);
   useEffect(() => { load(); }, [load]);
@@ -1558,6 +1594,31 @@ function PoolStockPage({ year, month, toast }) {
         </div>
       )}
 
+      {/* Pool Stock Summary — hotel tabs matching Monthly Results style */}
+      {hotels.length > 0 && activeSummaryHotel && (
+        <div className="section-gap">
+          <div className="card" style={{padding:"10px 14px", marginBottom:16}}>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {hotels.filter(h=>h.customer_type==="hotel").map(h=>(
+                <button key={h.id} className="btn btn-sm"
+                  style={{background:activeSummaryHotel?.id===h.id?"var(--navy)":"var(--sky)",
+                    color:activeSummaryHotel?.id===h.id?"#fff":"var(--navy)",border:"none"}}
+                  onClick={()=>setActiveSummaryHotel(h)}>
+                  {h.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          <HotelStockGrid
+            hotel_id={activeSummaryHotel.id}
+            hotel_name={activeSummaryHotel.name}
+            year={year}
+            month={month}
+            onClose={null}
+          />
+        </div>
+      )}
+
       {gridView && (
         <HotelStockGrid
           hotel_id={gridView.hotel_id}
@@ -1571,37 +1632,6 @@ function PoolStockPage({ year, month, toast }) {
       {summary && Object.keys(summary.checks.duplicate_packing_list_refs||{}).length > 0 && (
         <div className="alert alert-warn section-gap">
           ⚠ Duplicate packing list references detected: {Object.keys(summary.checks.duplicate_packing_list_refs).join(", ")}
-        </div>
-      )}
-
-      {summary && (
-        <div className="grid-2 section-gap">
-          <div className="card">
-            <div className="card-header"><span className="card-title">By Hotel</span></div>
-            <div className="tbl-wrap">
-              <table>
-                <thead><tr><th>Hotel</th><th style={{textAlign:"right"}}>Items</th></tr></thead>
-                <tbody>
-                  {Object.entries(summary.by_hotel).map(([name,qty])=>(
-                    <tr key={name}><td>{name}</td><td className="num mono">{qty.toLocaleString()}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-header"><span className="card-title">By Linen Item</span></div>
-            <div className="tbl-wrap">
-              <table>
-                <thead><tr><th>Item</th><th style={{textAlign:"right"}}>Quantity</th></tr></thead>
-                <tbody>
-                  {Object.entries(summary.by_linen_item).map(([name,qty])=>(
-                    <tr key={name}><td>{name}</td><td className="num mono">{qty.toLocaleString()}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
       )}
 
