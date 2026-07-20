@@ -1344,78 +1344,95 @@ function QuickEntry({ hotel, date, items, onDone, toast }) {
 }
 
 function PoolStockPage({ year, month, toast }) {
-  const [entries, setEntries] = useState([]);
-  const [hotels, setHotels] = useState([]);
-  const [summary, setSummary] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+  const [hotels, setHotels]           = useState([]);
+  const [activeHotel, setActiveHotel] = useState(null);
+  const [grid, setGrid]               = useState(null);
+  const [gridLoading, setGridLoading] = useState(false);
+  const [showModal, setShowModal]     = useState(false);
+  const [editing, setEditing]         = useState(null);
   const [form, setForm] = useState({ hotel_id:"", entry_date:"", linen_item:"", quantity:"", packing_list_ref:"", notes:"" });
-  const [editing, setEditing] = useState(null);
-  const [filter, setFilter] = useState({ hotel_id:"", linen_item:"", ref:"", date:"" });
-
-  // Quick entry state
-  const [quickEntry, setQuickEntry] = useState(null);
-  const [quickForm, setQuickForm] = useState({ hotel_id:"", entry_date:"" });
+  const [quickEntry, setQuickEntry]   = useState(null);
+  const [quickForm, setQuickForm]     = useState({ hotel_id:"", entry_date:"" });
   const [showQuickSetup, setShowQuickSetup] = useState(false);
-  const [gridView, setGridView] = useState(null);
-  const [activeSummaryHotel, setActiveSummaryHotel] = useState(null); // selected hotel for summary tab
-
-  // Photo scan state
   const [showScanUpload, setShowScanUpload] = useState(false);
-  const [scanForm, setScanForm] = useState({ hotel_id:"", entry_date:"" });
-  const [scanFile, setScanFile] = useState(null);
-  const [scanning, setScanning] = useState(false);
-  const [reviewScan, setReviewScan] = useState(null);
+  const [scanForm, setScanForm]       = useState({ hotel_id:"", entry_date:"" });
+  const [scanFile, setScanFile]       = useState(null);
+  const [scanning, setScanning]       = useState(false);
+  const [reviewScan, setReviewScan]   = useState(null);
+  const [totalItems, setTotalItems]   = useState(0);
 
-  const load = useCallback(() => {
-    const p = new URLSearchParams({ year, month });
-    if (filter.hotel_id) p.set("hotel_id", filter.hotel_id);
-    if (filter.linen_item) p.set("linen_item", filter.linen_item);
-    if (filter.ref) p.set("packing_list_ref", filter.ref);
-    if (filter.date) p.set("entry_date", filter.date);
-    Promise.all([
-      api(`/pool-stock?${p}`),
-      api("/hotels"),
-      api(`/pool-stock/summary/${year}/${month}`),
-    ]).then(([e, h, s]) => {
-      const active = h.filter(x=>x.active_status);
-      setEntries(e); setHotels(active); setSummary(s);
-      if (!activeSummaryHotel && active.length) setActiveSummaryHotel(active[0]);
+  // Load hotel list once
+  useEffect(() => {
+    api("/hotels").then(h => {
+      const active = h.filter(x => x.active_status && x.customer_type === "hotel");
+      setHotels(active);
+      if (active.length) setActiveHotel(active[0]);
     });
-  }, [year, month, filter]);
-  useEffect(() => { load(); }, [load]);
+  }, []);
+
+  // Load summary whenever hotel/month/year changes
+  useEffect(() => {
+    api(`/pool-stock/summary/${year}/${month}`).then(s => {
+      setTotalItems(s.overall_total || 0);
+    });
+  }, [year, month]);
+
+  useEffect(() => {
+    if (!activeHotel) return;
+    setGridLoading(true);
+    api(`/pool-stock/hotel-grid/${activeHotel.id}?year=${year}&month=${month}`)
+      .then(d => { setGrid(d); setGridLoading(false); })
+      .catch(() => setGridLoading(false));
+  }, [activeHotel, year, month]);
+
+  const reloadGrid = () => {
+    if (!activeHotel) return;
+    setGridLoading(true);
+    api(`/pool-stock/hotel-grid/${activeHotel.id}?year=${year}&month=${month}`)
+      .then(d => { setGrid(d); setGridLoading(false); });
+    api(`/pool-stock/summary/${year}/${month}`).then(s => setTotalItems(s.overall_total || 0));
+  };
 
   const openNew = () => {
     setEditing(null);
-    setForm({ hotel_id:"", entry_date:`${year}-${String(month).padStart(2,"0")}-01`, linen_item:"", quantity:"", packing_list_ref:"", notes:"" });
+    setForm({ hotel_id: activeHotel?.id||"", entry_date:`${year}-${String(month).padStart(2,"0")}-01`, linen_item:"", quantity:"", packing_list_ref:"", notes:"" });
     setShowModal(true);
   };
-  const openEdit = e => { setEditing(e); setForm({ hotel_id:e.hotel_id, entry_date:e.entry_date, linen_item:e.linen_item, quantity:e.quantity, packing_list_ref:e.packing_list_ref, notes:e.notes }); setShowModal(true); };
+
+  const openEdit = (item, date) => {
+    // Find the actual pool stock entry to edit
+    api(`/pool-stock?hotel_id=${activeHotel.id}&year=${year}&month=${month}`).then(entries => {
+      const e = entries.find(r => r.entry_date === date && r.linen_item === item);
+      if (e) {
+        setEditing(e);
+        setForm({ hotel_id:e.hotel_id, entry_date:e.entry_date, linen_item:e.linen_item, quantity:e.quantity, packing_list_ref:e.packing_list_ref||"", notes:e.notes||"" });
+        setShowModal(true);
+      }
+    });
+  };
 
   const save = async () => {
     const body = { ...form, hotel_id:parseInt(form.hotel_id), quantity:parseInt(form.quantity) };
     try {
       if (editing) await api(`/pool-stock/${editing.id}`, { method:"PATCH", body });
       else await api("/pool-stock", { method:"POST", body });
-      toast("Saved.", "ok"); setShowModal(false); load();
+      toast("Saved.", "ok"); setShowModal(false); reloadGrid();
     } catch(e) { toast(e.message, "error"); }
   };
 
   const del = async id => {
     if (!confirm("Delete this entry?")) return;
     await api(`/pool-stock/${id}`, { method:"DELETE" });
-    toast("Deleted.", "ok"); load();
+    toast("Deleted.", "ok"); reloadGrid();
   };
 
-  // ── Photo scan flow ──────────────────────────────────────────────────────
-
   const openScanUpload = () => {
-    setScanForm({ hotel_id:"", entry_date:`${year}-${String(month).padStart(2,"0")}-01` });
-    setScanFile(null);
-    setShowScanUpload(true);
+    setScanForm({ hotel_id: activeHotel?.id||"", entry_date:`${year}-${String(month).padStart(2,"0")}-01` });
+    setScanFile(null); setShowScanUpload(true);
   };
 
   const openQuickEntry = () => {
-    setQuickForm({ hotel_id: hotels[0]?.id || "", entry_date:`${year}-${String(month).padStart(2,"0")}-01` });
+    setQuickForm({ hotel_id: activeHotel?.id||"", entry_date:`${year}-${String(month).padStart(2,"0")}-01` });
     setShowQuickSetup(true);
   };
 
@@ -1441,95 +1458,55 @@ function PoolStockPage({ year, month, toast }) {
   };
 
   const startQuickEntry = () => {
-    const hotel = hotels.find(h => String(h.id) === String(quickForm.hotel_id));
+    const hotel = hotels.find(h => String(h.id) === String(quickForm.hotel_id)) || activeHotel;
     if (!hotel) { toast("Please select a hotel.", "error"); return; }
     if (!quickForm.entry_date) { toast("Please pick a date.", "error"); return; }
     setShowQuickSetup(false);
     setQuickEntry({ hotel, date: quickForm.entry_date, items: _getHotelTemplate(hotel.name) });
   };
 
+  // ── Scan flow ──
   const runScan = async () => {
-    if (!scanForm.hotel_id || !scanForm.entry_date) {
-      toast("Please choose a hotel and date first.", "error"); return;
-    }
-    if (!scanFile) {
-      toast("Please choose a photo to scan.", "error"); return;
-    }
+    if (!scanFile) { toast("Please select an image.", "error"); return; }
+    if (!scanForm.hotel_id || !scanForm.entry_date) { toast("Hotel and date required.", "error"); return; }
     setScanning(true);
+    const formData = new FormData();
+    formData.append("image", scanFile);
+    formData.append("hotel_id", scanForm.hotel_id);
+    formData.append("entry_date", scanForm.entry_date);
     try {
-      const formData = new FormData();
-      formData.append("hotel_id", scanForm.hotel_id);
-      formData.append("entry_date", scanForm.entry_date);
-      formData.append("image", scanFile);
       const res = await fetch(`${API}/pool-stock/scan`, { method:"POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Scan failed.");
-
-      // Backend now returns pre_filled_rows with the correct hotel-specific item
-      // names already matched in order. Much more reliable than guessing from OCR text.
-      const rows = data.pre_filled_rows.map(r => ({
-        linen_item: r.linen_item,
-        quantity: r.quantity !== "" ? r.quantity : "",
-        ocr_confidence: r.ocr_confidence,
-      }));
-
-      setReviewScan({
-        scan_id: data.scan_id,
-        hotel_id: scanForm.hotel_id,
-        hotel_name: data.hotel_name,
-        entry_date: scanForm.entry_date,
-        rows,
-        warning: data.warning,
-        using_template: data.using_hotel_template,
-        ocr_numbers_found: data.ocr_numbers_found,
-        template_count: data.template_item_count,
-        knownItems: LINEN_ITEMS,
-      });
+      const rows = data.pre_filled_rows.map(r => ({ linen_item: r.linen_item, quantity: r.quantity !== "" ? r.quantity : "", ocr_confidence: r.ocr_confidence }));
+      setReviewScan({ scan_id: data.scan_id, hotel_id: scanForm.hotel_id, hotel_name: data.hotel_name, entry_date: scanForm.entry_date, rows, warning: data.warning, using_template: data.using_hotel_template, knownItems: LINEN_ITEMS });
       setShowScanUpload(false);
-    } catch (e) {
-      toast(e.message, "error");
-    }
+    } catch(e) { toast(e.message, "error"); }
     setScanning(false);
   };
 
-  const updateReviewRow = (idx, field, value) => {
-    setReviewScan(rs => {
-      const rows = [...rs.rows];
-      rows[idx] = { ...rows[idx], [field]: value };
-      return { ...rs, rows };
-    });
-  };
-
-  const removeReviewRow = idx => {
-    setReviewScan(rs => ({ ...rs, rows: rs.rows.filter((_,i) => i!==idx) }));
-  };
-
-  const addReviewRow = () => {
-    setReviewScan(rs => ({ ...rs, rows: [...rs.rows, { linen_item:"", quantity:"", ocr_confidence:"manual" }] }));
-  };
-
-  const confirmScan = async () => {
-    const validRows = reviewScan.rows.filter(r => r.linen_item && r.quantity);
-    if (validRows.length === 0) {
-      toast("Add at least one item with a quantity before saving.", "error"); return;
-    }
+  const updateReviewRow  = (idx, field, val) => setReviewScan(rs => { const rows=[...rs.rows]; rows[idx]={...rows[idx],[field]:val}; return {...rs,rows}; });
+  const removeReviewRow  = idx => setReviewScan(rs => ({ ...rs, rows: rs.rows.filter((_,i)=>i!==idx) }));
+  const addReviewRow     = () => setReviewScan(rs => ({ ...rs, rows: [...rs.rows, { linen_item:"", quantity:"", ocr_confidence:"manual" }] }));
+  const discardScan      = async () => { if(reviewScan?.scan_id) await api(`/pool-stock/scan/${reviewScan.scan_id}/discard`,{method:"POST"}); setReviewScan(null); };
+  const confirmScan      = async () => {
+    const items = reviewScan.rows.filter(r => r.linen_item && r.quantity !== "" && parseInt(r.quantity) > 0);
+    if (!items.length) { toast("No items to save.", "error"); return; }
     try {
-      const result = await api(`/pool-stock/scan/${reviewScan.scan_id}/confirm`, {
-        method: "POST",
-        body: { items: validRows.map(r => ({ linen_item: r.linen_item, quantity: parseInt(r.quantity) })) }
-      });
-      toast(`Saved ${result.items_saved} item(s) from the scan.`, "ok");
-      setReviewScan(null);
-      load();
-    } catch (e) { toast(e.message, "error"); }
+      await api(`/pool-stock/scan/${reviewScan.scan_id}/confirm`, { method:"POST", body:{ hotel_id: reviewScan.hotel_id, entry_date: reviewScan.entry_date, items } });
+      toast(`Saved ${items.length} item(s).`, "ok"); setReviewScan(null); reloadGrid();
+    } catch(e) { toast(e.message, "error"); }
   };
 
-  const discardScan = async () => {
-    if (!confirm("Discard this scan? Nothing will be saved.")) return;
-    await api(`/pool-stock/scan/${reviewScan.scan_id}/discard`, { method: "POST" });
-    toast("Scan discarded.", "ok");
-    setReviewScan(null);
-  };
+  // Computed grid data
+  const columns   = grid?.columns || [];
+  const dataRows  = (grid?.rows || []).filter(r => r.date !== "TOTAL");
+  const totalRow  = (grid?.rows || []).find(r => r.date === "TOTAL");
+  const itemTotals = {};
+  columns.forEach(col => { itemTotals[col] = dataRows.reduce((s,r) => s + (parseInt(r[col])||0), 0); });
+  const activeItems   = columns.filter(c => itemTotals[c] > 0);
+  const activeDates   = dataRows.filter(r => r._total > 0);
+  const hotelTotal    = totalRow?._total || 0;
 
   return (
     <div className="page">
@@ -1539,18 +1516,14 @@ function PoolStockPage({ year, month, toast }) {
           date={quickEntry.date}
           items={quickEntry.items}
           toast={toast}
-          onDone={() => {
-            setQuickEntry(null);
-            setGridView({ hotel_id: quickEntry.hotel.id, hotel_name: quickEntry.hotel.name, year, month });
-            load();
-          }}
+          onDone={() => { setQuickEntry(null); reloadGrid(); }}
         />
       )}
 
       <div className="flex-between page-header">
         <div>
           <div className="page-title">Pool Stock</div>
-          <div className="page-sub">{MONTHS[month]} {year} — {summary?.overall_total?.toLocaleString()||0} items total</div>
+          <div className="page-sub">{MONTHS[month]} {year} — {totalItems.toLocaleString()} items total</div>
         </div>
         <div className="flex gap-8">
           <button className="btn btn-primary" onClick={openQuickEntry}>⚡ Quick Entry</button>
@@ -1559,6 +1532,7 @@ function PoolStockPage({ year, month, toast }) {
         </div>
       </div>
 
+      {/* Quick entry setup modal */}
       {showQuickSetup && (
         <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShowQuickSetup(false)}>
           <div className="modal" style={{width:420}}>
@@ -1568,7 +1542,7 @@ function PoolStockPage({ year, month, toast }) {
             </div>
             <div className="modal-body">
               <p className="text-soft" style={{fontSize:13,marginBottom:16}}>
-                Enter all items for one hotel in one go — one item at a time, full screen, keyboard only. Press Enter to move to the next item.
+                Enter all items for one hotel in one go — keyboard only, press Enter to advance.
               </p>
               <div className="form-grid form-grid-2">
                 <div className="form-row">
@@ -1594,137 +1568,105 @@ function PoolStockPage({ year, month, toast }) {
         </div>
       )}
 
-      {/* Pool Stock Summary — hotel tabs matching Monthly Results style */}
-      {hotels.length > 0 && activeSummaryHotel && (
-        <div className="section-gap">
-          <div className="card" style={{padding:"10px 14px", marginBottom:16}}>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              {hotels.filter(h=>h.customer_type==="hotel").map(h=>(
-                <button key={h.id} className="btn btn-sm"
-                  style={{background:activeSummaryHotel?.id===h.id?"var(--navy)":"var(--sky)",
-                    color:activeSummaryHotel?.id===h.id?"#fff":"var(--navy)",border:"none"}}
-                  onClick={()=>setActiveSummaryHotel(h)}>
-                  {h.name}
-                </button>
-              ))}
-            </div>
-          </div>
-          <HotelStockGrid
-            hotel_id={activeSummaryHotel.id}
-            hotel_name={activeSummaryHotel.name}
-            year={year}
-            month={month}
-            onClose={null}
-          />
-        </div>
-      )}
-
-      {gridView && (
-        <HotelStockGrid
-          hotel_id={gridView.hotel_id}
-          hotel_name={gridView.hotel_name}
-          year={gridView.year}
-          month={gridView.month}
-          onClose={() => setGridView(null)}
-        />
-      )}
-
-      {summary && Object.keys(summary.checks.duplicate_packing_list_refs||{}).length > 0 && (
-        <div className="alert alert-warn section-gap">
-          ⚠ Duplicate packing list references detected: {Object.keys(summary.checks.duplicate_packing_list_refs).join(", ")}
-        </div>
-      )}
-
-      <div className="card">
-        <div className="card-header">
-          <span className="card-title">All Entries</span>
-          <div className="flex gap-8" style={{flexWrap:"wrap"}}>
-            <input type="date" className="input input-sm"
-              value={filter.date}
-              onChange={e=>setFilter({...filter, date:e.target.value})}
-              title="Filter by exact date" />
-            {filter.date && (
-              <button className="btn btn-secondary btn-xs" onClick={()=>setFilter({...filter,date:""})}>
-                Clear date
-              </button>
-            )}
-            <select className="input input-sm" value={filter.hotel_id} onChange={e=>setFilter({...filter,hotel_id:e.target.value})}>
-              <option value="">All hotels</option>
-              {hotels.map(h=><option key={h.id} value={h.id}>{h.name}</option>)}
-            </select>
-            <select className="input input-sm" value={filter.linen_item} onChange={e=>setFilter({...filter,linen_item:e.target.value})}>
-              <option value="">All items</option>
-              {LINEN_ITEMS.map(i=><option key={i} value={i}>{i}</option>)}
-            </select>
-            <input className="input input-sm" placeholder="Ref…" value={filter.ref} onChange={e=>setFilter({...filter,ref:e.target.value})} style={{width:100}} />
-          </div>
-        </div>
-        <div className="tbl-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Hotel</th><th>Linen Item</th>
-                <th style={{textAlign:"right"}}>Qty</th>
-                <th>Packing List Ref</th><th>Notes</th><th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.length === 0 && (
-                <tr><td colSpan={6}><div className="empty-state"><div className="empty-icon">📦</div><div className="empty-title">No entries yet</div><div>Use Quick Entry or Add entry above.</div></div></td></tr>
-              )}
-              {(() => {
-                // Group entries by date and render with date header rows
-                const groups = [];
-                let currentDate = null;
-                entries.forEach(e => {
-                  if (e.entry_date !== currentDate) {
-                    currentDate = e.entry_date;
-                    const d = new Date(e.entry_date + "T00:00:00");
-                    const label = d.toLocaleDateString("en-GB", { weekday:"short", day:"numeric", month:"long", year:"numeric" });
-                    groups.push({ type:"date", date: e.entry_date, label });
-                  }
-                  groups.push({ type:"entry", entry: e });
-                });
-                return groups.map((g, i) => {
-                  if (g.type === "date") return (
-                    <tr key={`date-${g.date}`}>
-                      <td colSpan={6} style={{
-                        background:"var(--sky)", fontWeight:700, fontSize:12,
-                        color:"var(--navy)", padding:"8px 14px", letterSpacing:"0.04em",
-                        textTransform:"uppercase", borderTop: i > 0 ? "2px solid var(--sky-deep)" : "none"
-                      }}>
-                        {g.label}
-                      </td>
-                    </tr>
-                  );
-                  const e = g.entry;
-                  return (
-                    <tr key={e.id}>
-                      <td>{e.hotel_name}</td>
-                      <td>{e.linen_item}</td>
-                      <td className="num mono">{e.quantity}</td>
-                      <td className="mono" style={{fontSize:12}}>{e.packing_list_ref||"—"}</td>
-                      <td className="text-soft">{e.notes||"—"}</td>
-                      <td>
-                        <div className="flex gap-8">
-                          <button className="btn btn-secondary btn-xs" onClick={()=>openEdit(e)}>Edit</button>
-                          <button className="btn btn-danger btn-xs" onClick={()=>del(e.id)}>Del</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                });
-              })()}
-            </tbody>
-          </table>
+      {/* Hotel tabs — like Monthly Results */}
+      <div className="card section-gap" style={{padding:"10px 14px"}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {hotels.map(h => (
+            <button key={h.id} className="btn btn-sm"
+              style={{background:activeHotel?.id===h.id?"var(--navy)":"var(--sky)",
+                color:activeHotel?.id===h.id?"#fff":"var(--navy)",border:"none"}}
+              onClick={()=>setActiveHotel(h)}>
+              {h.name}
+            </button>
+          ))}
         </div>
       </div>
 
+      {/* KPI row for active hotel */}
+      {activeHotel && (
+        <div className="kpi-grid section-gap">
+          <div className="kpi-card">
+            <div className="kpi-label">{activeHotel.name} — Month Total</div>
+            <div className="kpi-value" style={{color:"var(--amber)"}}>{hotelTotal.toLocaleString()}</div>
+            <div className="kpi-sub">{activeDates.length} delivery date(s) · {activeItems.length} item types</div>
+          </div>
+        </div>
+      )}
+
+      {/* Main summary table */}
+      {gridLoading ? (
+        <div className="card" style={{padding:40,textAlign:"center"}}>
+          <div className="spinner"></div>
+          <div className="text-soft" style={{marginTop:12}}>Loading {activeHotel?.name}…</div>
+        </div>
+      ) : activeItems.length === 0 ? (
+        <div className="card">
+          <div className="card-body" style={{textAlign:"center",padding:"40px 32px"}}>
+            <div style={{fontSize:40,marginBottom:12}}>🛏</div>
+            <div style={{fontWeight:700,fontSize:16,marginBottom:6}}>No entries yet for {activeHotel?.name}</div>
+            <div className="text-soft" style={{fontSize:13,marginBottom:20}}>
+              Use ⚡ Quick Entry to add this month's pool stock in under 90 seconds.
+            </div>
+            <button className="btn btn-primary" onClick={openQuickEntry}>⚡ Quick Entry</button>
+          </div>
+        </div>
+      ) : (
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Weekly Entries — {activeHotel?.name}</span>
+            <span className="text-soft" style={{fontSize:12}}>Click a quantity to edit</span>
+          </div>
+          <div className="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style={{minWidth:220,textAlign:"left"}}>Linen Item</th>
+                  {activeDates.map(r => (
+                    <th key={r.date} style={{textAlign:"right",minWidth:90,fontSize:11}}>{r.date}</th>
+                  ))}
+                  <th style={{textAlign:"right",minWidth:80,fontWeight:700}}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeItems.map((col, i) => (
+                  <tr key={col} style={{background:i%2===0?"transparent":"#FAFBFD"}}>
+                    <td style={{fontWeight:500,fontSize:13}}>{col}</td>
+                    {activeDates.map(r => (
+                      <td key={r.date} className="num mono" style={{fontSize:12,
+                        color: r[col] ? "var(--navy)" : "var(--ink-soft)",
+                        cursor: r[col] ? "pointer" : "default"}}
+                        onClick={() => r[col] && openEdit(col, r.date)}
+                        title={r[col] ? "Click to edit" : ""}>
+                        {r[col] || "—"}
+                      </td>
+                    ))}
+                    <td className="num mono" style={{fontWeight:700,color:"var(--navy)"}}>{itemTotals[col]}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="tfoot-row">
+                  <td><strong>TOTAL</strong></td>
+                  {activeDates.map(r => (
+                    <td key={r.date} className="num mono" style={{fontSize:12}}>{r._total||"—"}</td>
+                  ))}
+                  <td className="num mono" style={{fontWeight:700}}>{hotelTotal}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="text-soft" style={{fontSize:12,padding:"8px 20px 16px"}}>
+            {columns.filter(c=>itemTotals[c]===0).length} items with no entries hidden
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit entry modal */}
       {showModal && (
         <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShowModal(false)}>
-          <div className="modal">
+          <div className="modal" style={{width:480}}>
             <div className="modal-header">
-              <span className="modal-title">{editing?"Edit entry":"Add pool stock entry"}</span>
+              <span className="modal-title">{editing?"Edit Entry":"Add Entry"}</span>
               <button className="modal-close" onClick={()=>setShowModal(false)}>×</button>
             </div>
             <div className="modal-body">
@@ -1744,7 +1686,7 @@ function PoolStockPage({ year, month, toast }) {
                   <label className="form-label">Linen Item</label>
                   <select className="input" value={form.linen_item} onChange={e=>setForm({...form,linen_item:e.target.value})}>
                     <option value="">Select…</option>
-                    {LINEN_ITEMS.map(i=><option key={i} value={i}>{i}</option>)}
+                    {(activeHotel ? _getHotelTemplate(activeHotel.name) : LINEN_ITEMS).map(i=><option key={i} value={i}>{i}</option>)}
                   </select>
                 </div>
                 <div className="form-row">
@@ -1752,14 +1694,20 @@ function PoolStockPage({ year, month, toast }) {
                   <input type="number" min="0" className="input" value={form.quantity} onChange={e=>setForm({...form,quantity:e.target.value})} />
                 </div>
                 <div className="form-row">
-                  <label className="form-label">Packing List Ref</label>
-                  <input className="input" value={form.packing_list_ref} onChange={e=>setForm({...form,packing_list_ref:e.target.value})} placeholder="e.g. PL-01-2503-12" />
+                  <label className="form-label">Packing List Ref <span className="text-soft">(opt)</span></label>
+                  <input className="input" value={form.packing_list_ref} onChange={e=>setForm({...form,packing_list_ref:e.target.value})} />
                 </div>
                 <div className="form-row">
-                  <label className="form-label">Notes</label>
-                  <input className="input" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="Optional" />
+                  <label className="form-label">Notes <span className="text-soft">(opt)</span></label>
+                  <input className="input" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} />
                 </div>
               </div>
+              {editing && (
+                <button className="btn btn-danger btn-sm" style={{marginTop:8}}
+                  onClick={async()=>{ await del(editing.id); setShowModal(false); }}>
+                  Delete this entry
+                </button>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={()=>setShowModal(false)}>Cancel</button>
@@ -1769,19 +1717,15 @@ function PoolStockPage({ year, month, toast }) {
         </div>
       )}
 
-      {/* Step 1: upload a photo of the packing list */}
+      {/* Scan upload modal */}
       {showScanUpload && (
         <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShowScanUpload(false)}>
-          <div className="modal">
+          <div className="modal" style={{width:460}}>
             <div className="modal-header">
-              <span className="modal-title">📷 Scan a packing list</span>
+              <span className="modal-title">📷 Scan packing list</span>
               <button className="modal-close" onClick={()=>setShowScanUpload(false)}>×</button>
             </div>
             <div className="modal-body">
-              <p className="text-soft" style={{fontSize:13, marginBottom:16}}>
-                Upload a photo of the filled-in packing list. The system will read the numbers
-                and show them to you on the next screen — nothing is saved until you confirm it looks right.
-              </p>
               <div className="form-grid form-grid-2">
                 <div className="form-row">
                   <label className="form-label">Hotel</label>
@@ -1795,16 +1739,9 @@ function PoolStockPage({ year, month, toast }) {
                   <input type="date" className="input" value={scanForm.entry_date} onChange={e=>setScanForm({...scanForm,entry_date:e.target.value})} />
                 </div>
               </div>
-              <div className="form-row" style={{marginTop:16}}>
-                <label className="form-label">Photo</label>
-                <input type="file" accept="image/*" className="input"
-                  onChange={e=>setScanFile(e.target.files[0])} />
-                {scanFile && (
-                  <div style={{marginTop:10}}>
-                    <img src={URL.createObjectURL(scanFile)} alt="Preview"
-                      style={{maxWidth:"100%", maxHeight:200, borderRadius:6, border:"1px solid var(--rule)"}} />
-                  </div>
-                )}
+              <div className="form-row" style={{marginTop:12}}>
+                <label className="form-label">Photo of packing list</label>
+                <input type="file" accept="image/*" className="input" onChange={e=>setScanFile(e.target.files[0])} />
               </div>
             </div>
             <div className="modal-footer">
@@ -1817,72 +1754,57 @@ function PoolStockPage({ year, month, toast }) {
         </div>
       )}
 
-      {/* Step 2: review and correct what was detected before saving */}
+      {/* Review scan modal */}
       {reviewScan && (
-        <div className="overlay" onClick={e=>e.target===e.currentTarget&&null}>
-          <div className="modal" style={{ width: 660 }}>
+        <div className="overlay">
+          <div className="modal" style={{width:660,maxHeight:"90vh",overflowY:"auto"}}>
             <div className="modal-header">
               <span className="modal-title">Review scanned items — {reviewScan.hotel_name}</span>
               <button className="modal-close" onClick={discardScan}>×</button>
             </div>
             <div className="modal-body">
-              {reviewScan.warning && (
-                <div className="alert alert-warn" style={{marginBottom:16}}>⚠ {reviewScan.warning}</div>
-              )}
+              {reviewScan.warning && <div className="alert alert-warn" style={{marginBottom:16}}>⚠ {reviewScan.warning}</div>}
               {reviewScan.using_template && (
                 <div className="alert alert-ok" style={{marginBottom:14}}>
-                  ✓ Using {reviewScan.hotel_name}'s template — item names are pre-filled in the correct order.
-                  Just check the quantities and correct any misread numbers.
+                  ✓ Using {reviewScan.hotel_name}'s template — item names pre-filled. Just check quantities.
                 </div>
               )}
-              <p className="text-soft" style={{fontSize:13, marginBottom:14}}>
-                Item names are filled in from the hotel's known packing list.
-                Check each quantity — correct any that look wrong, leave blank any items that weren't packed today.
-                Nothing saves until you click Confirm.
-              </p>
-              <div className="tbl-wrap" style={{ maxHeight:420, overflowY:"auto" }}>
+              <div className="tbl-wrap" style={{maxHeight:420,overflowY:"auto"}}>
                 <table>
                   <thead>
                     <tr>
                       <th style={{minWidth:220}}>Linen Item</th>
-                      <th style={{textAlign:"right", minWidth:120}}>Quantity Packed</th>
+                      <th style={{textAlign:"right",minWidth:120}}>Quantity Packed</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {reviewScan.rows.map((row, idx) => (
-                      <tr key={idx} style={{ background: row.quantity === "" ? "#FFFBEB" : "transparent" }}>
+                    {reviewScan.rows.map((row,idx)=>(
+                      <tr key={idx} style={{background:row.quantity===""?"#FFFBEB":"transparent"}}>
                         <td>
-                          {row.ocr_confidence === "manual" ? (
-                            <select className="input input-sm" value={row.linen_item}
-                              onChange={e=>updateReviewRow(idx,"linen_item",e.target.value)}>
-                              <option value="">Select item…</option>
-                              {LINEN_ITEMS.map(i=><option key={i} value={i}>{i}</option>)}
-                            </select>
-                          ) : (
-                            <span style={{fontSize:13, fontWeight:500}}>{row.linen_item}</span>
-                          )}
+                          {row.ocr_confidence==="manual"
+                            ? <select className="input input-sm" value={row.linen_item} onChange={e=>updateReviewRow(idx,"linen_item",e.target.value)}>
+                                <option value="">Select item…</option>
+                                {LINEN_ITEMS.map(i=><option key={i} value={i}>{i}</option>)}
+                              </select>
+                            : <span style={{fontSize:13,fontWeight:500}}>{row.linen_item}</span>
+                          }
                         </td>
                         <td style={{padding:"5px 8px"}}>
                           <input type="number" min="0" className="input input-money input-sm"
-                            value={row.quantity}
-                            placeholder="0"
+                            value={row.quantity} placeholder="0"
                             onChange={e=>updateReviewRow(idx,"quantity",e.target.value)} />
                         </td>
-                        <td>
-                          <button className="btn btn-danger btn-xs" onClick={()=>removeReviewRow(idx)}>✕</button>
-                        </td>
+                        <td><button className="btn btn-danger btn-xs" onClick={()=>removeReviewRow(idx)}>✕</button></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <button className="btn btn-secondary btn-sm" style={{marginTop:12}} onClick={addReviewRow}>
-                + Add a missed item
-              </button>
+              <button className="btn btn-secondary btn-sm" style={{marginTop:12}} onClick={addReviewRow}>+ Add missed item</button>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-danger" onClick={discardScan}>Discard scan</button>
+              <button className="btn btn-danger" onClick={discardScan}>Discard</button>
               <button className="btn btn-primary" onClick={confirmScan}>Confirm and save</button>
             </div>
           </div>
@@ -1892,9 +1814,7 @@ function PoolStockPage({ year, month, toast }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COMPARISON PAGE
-// ─────────────────────────────────────────────────────────────────────────────
+
 function ComparisonPage({ year, month }) {
   const [hotels, setHotels] = useState([]);
   const [messages, setMessages] = useState([
